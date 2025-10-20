@@ -46,7 +46,10 @@ initSqlJs().then(SQL => {
     ON leaderboard(difficulty, time)
   `);
   
-  console.log('Database initialized');
+  // Save database to disk immediately after creation
+  saveDatabase();
+  
+  console.log('Database initialized and saved to disk');
 }).catch(err => {
   console.error('Failed to initialize database:', err);
 });
