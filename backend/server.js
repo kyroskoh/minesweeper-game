@@ -63,6 +63,22 @@ function saveDatabase() {
   }
 }
 
+// Function to reload database from disk
+async function reloadDatabase() {
+  try {
+    const SQL = await initSqlJs();
+    const buffer = fs.readFileSync(dbPath);
+    if (db) {
+      db.close();
+    }
+    db = new SQL.Database(buffer);
+    return true;
+  } catch (error) {
+    console.error('Error reloading database:', error);
+    return false;
+  }
+}
+
 // Difficulty names
 const difficultyNames = {
   '8-8-10': 'Easy',
@@ -340,10 +356,13 @@ app.post('/api/leaderboard', (req, res) => {
   }
 });
 
-app.get('/api/leaderboard/:difficulty', (req, res) => {
+app.get('/api/leaderboard/:difficulty', async (req, res) => {
   const { difficulty } = req.params;
   
   try {
+    // Reload database from disk to get latest data
+    await reloadDatabase();
+    
     const stmt = db.prepare(
       'SELECT name, time, difficulty, date FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
     );
@@ -362,10 +381,13 @@ app.get('/api/leaderboard/:difficulty', (req, res) => {
   }
 });
 
-app.get('/api/leaderboard', (req, res) => {
+app.get('/api/leaderboard', async (req, res) => {
   const byDifficulty = {};
   
   try {
+    // Reload database from disk to get latest data
+    await reloadDatabase();
+    
     Object.keys(difficultyNames).forEach(key => {
       const diffName = difficultyNames[key];
       const stmt = db.prepare(
