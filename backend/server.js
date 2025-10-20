@@ -306,6 +306,13 @@ app.get('/api/leaderboard', (req, res) => {
   res.json({ leaderboard: byDifficulty });
 });
 
-app.listen(PORT, () => {
-  console.log(`Minesweeper server running on http://localhost:${PORT}`);
-});
+//app.listen(PORT, () => {
+//  console.log(`Minesweeper server running on http://localhost:${PORT}`);
+//});
+
+// Bind only to loopback (safer)
+app.listen(PORT, '127.0.0.1', () => console.log(`API on 127.0.0.1:${PORT}`));
+
+// If you use secure cookies/sessions behind Nginx:
+app.set('trust proxy', 1); // so req.secure / X-Forwarded-* work
+

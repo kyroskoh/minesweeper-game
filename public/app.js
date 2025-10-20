@@ -1,9 +1,12 @@
-const API_URL = 'http://localhost:3030/api';
+//const API_URL = 'http://localhost:3030/api';
+// In the frontend/browser:
+const API_URL = 'https://mine.kyros.party/api';
 
 let gameId = null;
 let gameState = null;
 let flagsPlaced = 0;
 let timerInterval = null;
+let localStartTime = null;
 
 const boardElement = document.getElementById('board');
 const minesCountElement = document.getElementById('minesCount');
@@ -46,6 +49,7 @@ async function startNewGame() {
       clearInterval(timerInterval);
       timerInterval = null;
     }
+    localStartTime = null;
     timerElement.textContent = '0s';
     
     renderBoard();
@@ -126,10 +130,13 @@ async function handleCellClick(row, col) {
     renderBoard();
     updateGameInfo();
     
-    // Force timer update after first move
-    if (gameState.startTime && timerInterval) {
-      updateTimer();
+    // Synchronize local timer with server time
+    if (gameState.startTime && !localStartTime) {
+      localStartTime = Date.now() - (gameState.elapsedTime * 1000);
     }
+    
+    // Update timer display immediately
+    updateTimer();
     
     if (data.gameOver) {
       handleGameOver(data.won);
@@ -181,9 +188,9 @@ function updateTimer() {
     return;
   }
   
-  // Check if game has started (startTime is set after first move)
-  if (gameState.startTime) {
-    const elapsed = Math.floor((Date.now() - gameState.startTime) / 1000);
+  // Use synchronized local start time for smooth counting
+  if (localStartTime) {
+    const elapsed = Math.floor((Date.now() - localStartTime) / 1000);
     timerElement.textContent = `${elapsed}s`;
   }
 }
@@ -202,8 +209,8 @@ function updateGameInfo() {
   minesCountElement.textContent = gameState.minesCount;
   flagsCountElement.textContent = flagsPlaced;
   
-  // Only update timer from server if game is over (final time) or timer hasn't started yet
-  if (gameState.elapsedTime !== undefined && (!gameState.startTime || gameState.gameOver)) {
+  // Always update timer from server to avoid clock skew
+  if (gameState.elapsedTime !== undefined) {
     timerElement.textContent = `${gameState.elapsedTime}s`;
   }
   
