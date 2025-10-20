@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
+const initSqlJs = require('sql.js');
 
 const app = express();
 const PORT = 3030;
@@ -11,7 +13,52 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Store games in memory (in production, use a database)
 const games = new Map();
-const leaderboard = [];
+
+// Initialize SQLite database
+const dbPath = path.join(__dirname, '../leaderboard.db');
+let db;
+
+initSqlJs().then(SQL => {
+  let buffer;
+  try {
+    buffer = fs.readFileSync(dbPath);
+  } catch (error) {
+    // Database doesn't exist yet
+    buffer = null;
+  }
+  
+  db = new SQL.Database(buffer);
+  
+  // Create leaderboard table if it doesn't exist
+  db.run(`
+    CREATE TABLE IF NOT EXISTS leaderboard (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      time INTEGER NOT NULL,
+      difficulty TEXT NOT NULL,
+      date TEXT NOT NULL
+    )
+  `);
+  
+  // Create index for faster queries
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_difficulty_time 
+    ON leaderboard(difficulty, time)
+  `);
+  
+  console.log('Database initialized');
+}).catch(err => {
+  console.error('Failed to initialize database:', err);
+});
+
+// Function to save database to disk
+function saveDatabase() {
+  if (db) {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(dbPath, buffer);
+  }
+}
 
 // Difficulty names
 const difficultyNames = {
@@ -276,40 +323,67 @@ app.post('/api/leaderboard', (req, res) => {
     date: new Date().toISOString()
   };
 
-  leaderboard.push(entry);
-  
-  // Keep only top 100 entries
-  leaderboard.sort((a, b) => a.time - b.time);
-  if (leaderboard.length > 100) {
-    leaderboard.length = 100;
+  try {
+    db.run(
+      'INSERT INTO leaderboard (name, time, difficulty, date) VALUES (?, ?, ?, ?)',
+      [entry.name, entry.time, entry.difficulty, entry.date]
+    );
+    saveDatabase();
+    
+    res.json({ success: true, entry });
+  } catch (error) {
+    console.error('Error saving to leaderboard:', error);
+    res.status(500).json({ error: 'Failed to save score' });
   }
-
-  res.json({ success: true, entry });
 });
 
 app.get('/api/leaderboard/:difficulty', (req, res) => {
   const { difficulty } = req.params;
   
-  const filtered = leaderboard
-    .filter(entry => entry.difficulty === difficulty)
-    .sort((a, b) => a.time - b.time)
-    .slice(0, 10); // Top 10 for each difficulty
-
-  res.json({ leaderboard: filtered });
+  try {
+    const stmt = db.prepare(
+      'SELECT name, time, difficulty, date FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
+    );
+    stmt.bind([difficulty]);
+    
+    const scores = [];
+    while (stmt.step()) {
+      scores.push(stmt.getAsObject());
+    }
+    stmt.free();
+    
+    res.json({ leaderboard: scores });
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
 });
 
 app.get('/api/leaderboard', (req, res) => {
   const byDifficulty = {};
   
-  Object.keys(difficultyNames).forEach(key => {
-    const diffName = difficultyNames[key];
-    byDifficulty[diffName] = leaderboard
-      .filter(entry => entry.difficulty === diffName)
-      .sort((a, b) => a.time - b.time)
-      .slice(0, 10);
-  });
+  try {
+    Object.keys(difficultyNames).forEach(key => {
+      const diffName = difficultyNames[key];
+      const stmt = db.prepare(
+        'SELECT name, time, difficulty, date FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
+      );
+      stmt.bind([diffName]);
+      
+      const scores = [];
+      while (stmt.step()) {
+        scores.push(stmt.getAsObject());
+      }
+      stmt.free();
+      
+      byDifficulty[diffName] = scores;
+    });
 
-  res.json({ leaderboard: byDifficulty });
+    res.json({ leaderboard: byDifficulty });
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
 });
 
 //app.listen(PORT, () => {
@@ -321,4 +395,19 @@ app.listen(PORT, '127.0.0.1', () => console.log(`API on 127.0.0.1:${PORT}`));
 
 // If you use secure cookies/sessions behind Nginx:
 app.set('trust proxy', 1); // so req.secure / X-Forwarded-* work
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\nShutting down gracefully...');
+  saveDatabase();
+  if (db) db.close();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\nShutting down gracefully...');
+  saveDatabase();
+  if (db) db.close();
+  process.exit(0);
+});
 

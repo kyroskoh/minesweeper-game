@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Database
+leaderboard.db
+leaderboard.db-shm
+leaderboard.db-wal
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
