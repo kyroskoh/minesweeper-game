@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3000/api';
+const API_URL = 'http://localhost:3030/api';
 
 let gameId = null;
 let gameState = null;
