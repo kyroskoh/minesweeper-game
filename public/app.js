@@ -195,14 +195,19 @@ function formatTime(totalSeconds) {
   const seconds = totalSeconds % 60;
   
   if (days > 0) {
-    return `${days}d ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    return `${days}d:${String(hours).padStart(2, '0')}h:${String(minutes).padStart(2, '0')}m:${String(seconds).padStart(2, '0')}s`;
   } else if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    return `${String(hours).padStart(2, '0')}h:${String(minutes).padStart(2, '0')}m:${String(seconds).padStart(2, '0')}s`;
   } else if (minutes > 0) {
-    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    return `${String(minutes).padStart(2, '0')}m:${String(seconds).padStart(2, '0')}s`;
   } else {
-    return `${seconds}s`;
+    return `${String(seconds).padStart(2, '0')}s`;
   }
+}
+
+function formatTimeWithTotal(totalSeconds) {
+  const formatted = formatTime(totalSeconds);
+  return `${formatted} (${totalSeconds}s)`;
 }
 
 function updateTimer() {
@@ -340,7 +345,7 @@ function displayLeaderboard(scores) {
       <tr>
         <td>${index + 1}</td>
         <td>${score.name}</td>
-        <td>${formatTime(score.time)}</td>
+        <td>${formatTimeWithTotal(score.time)}</td>
         <td>${date}</td>
       </tr>
     `;

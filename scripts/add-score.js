@@ -115,22 +115,30 @@ async function addScore() {
 
   // Format time for display
   function formatTime(totalSeconds) {
-    const hours = Math.floor(totalSeconds / 3600);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     
-    if (hours > 0) {
-      return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    if (days > 0) {
+      return `${days}d:${String(hours).padStart(2, '0')}h:${String(minutes).padStart(2, '0')}m:${String(seconds).padStart(2, '0')}s`;
+    } else if (hours > 0) {
+      return `${String(hours).padStart(2, '0')}h:${String(minutes).padStart(2, '0')}m:${String(seconds).padStart(2, '0')}s`;
     } else if (minutes > 0) {
-      return `${minutes}:${String(seconds).padStart(2, '0')}`;
+      return `${String(minutes).padStart(2, '0')}m:${String(seconds).padStart(2, '0')}s`;
     } else {
-      return `${seconds}s`;
+      return `${String(seconds).padStart(2, '0')}s`;
     }
+  }
+  
+  function formatTimeWithTotal(totalSeconds) {
+    const formatted = formatTime(totalSeconds);
+    return `${formatted} (${totalSeconds}s)`;
   }
 
   console.log('\n📝 Adding score to leaderboard...');
   console.log(`   Name: ${name}`);
-  console.log(`   Time: ${formatTime(timeInSeconds)} (${timeInSeconds} seconds)`);
+  console.log(`   Time: ${formatTimeWithTotal(timeInSeconds)}`);
   console.log(`   Difficulty: ${difficulty}`);
   console.log(`   Date: ${new Date(date).toLocaleDateString()}`);
 
@@ -176,7 +184,7 @@ async function addScore() {
     let rank = 1;
     while (stmt.step()) {
       const row = stmt.getAsObject();
-      console.log(`   ${rank}. ${row.name} - ${formatTime(row.time)}`);
+      console.log(`   ${rank}. ${row.name} - ${formatTimeWithTotal(row.time)}`);
       rank++;
     }
     stmt.free();
