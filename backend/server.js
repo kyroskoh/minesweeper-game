@@ -20,16 +20,21 @@ let db;
 
 initSqlJs().then(SQL => {
   let buffer;
+  let isNewDatabase = false;
+  
   try {
     buffer = fs.readFileSync(dbPath);
+    console.log('Loading existing database from disk...');
   } catch (error) {
     // Database doesn't exist yet
     buffer = null;
+    isNewDatabase = true;
+    console.log('Creating new database...');
   }
   
   db = new SQL.Database(buffer);
   
-  // Create leaderboard table if it doesn't exist
+  // Create leaderboard table if it doesn't exist (only runs for new DB)
   db.run(`
     CREATE TABLE IF NOT EXISTS leaderboard (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,16 +45,19 @@ initSqlJs().then(SQL => {
     )
   `);
   
-  // Create index for faster queries
+  // Create index for faster queries (only runs for new DB)
   db.run(`
     CREATE INDEX IF NOT EXISTS idx_difficulty_time 
     ON leaderboard(difficulty, time)
   `);
   
-  // Save database to disk immediately after creation
-  saveDatabase();
-  
-  console.log('Database initialized and saved to disk');
+  // Only save to disk if it's a new database
+  if (isNewDatabase) {
+    saveDatabase();
+    console.log('New database initialized and saved to disk');
+  } else {
+    console.log('Existing database loaded successfully');
+  }
 }).catch(err => {
   console.error('Failed to initialize database:', err);
 });
