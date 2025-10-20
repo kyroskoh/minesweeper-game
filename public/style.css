@@ -232,6 +232,24 @@ h1 {
   font-weight: bold;
 }
 
+.sync-status {
+  width: 100%;
+  padding: 10px 15px;
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: 8px;
+  margin: 15px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9em;
+  color: #856404;
+}
+
+.sync-icon {
+  font-size: 1.2em;
+}
+
 .leaderboard-btn {
   width: 100%;
   padding: 12px 20px;
@@ -386,4 +404,42 @@ h1 {
   padding: 40px 20px;
   color: #999;
   font-style: italic;
+}
+
+/* Developer Mode */
+.dev-mine {
+  position: relative;
+  background: rgba(255, 193, 7, 0.2) !important;
+  border-color: #ffc107 !important;
+}
+
+.dev-mine::before {
+  content: attr(data-dev);
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 0.6em;
+  opacity: 0.7;
+}
+
+.dev-notification {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-100px);
+  background: #4CAF50;
+  color: white;
+  padding: 15px 30px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  font-weight: 600;
+  font-size: 1.1em;
+  z-index: 10000;
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.dev-notification.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
 }

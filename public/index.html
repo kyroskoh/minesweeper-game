@@ -41,6 +41,11 @@
 
     <div id="board" class="board"></div>
 
+    <div id="syncStatus" class="sync-status" style="display: none;">
+      <span class="sync-icon">⚠️</span>
+      <span id="syncText">Pending scores will sync when online</span>
+    </div>
+
     <button id="leaderboardBtn" class="leaderboard-btn">🏆 View Leaderboard</button>
 
     <div id="leaderboardModal" class="modal">
@@ -61,9 +66,10 @@
     <div class="instructions">
       <h3>How to Play</h3>
       <ul>
-        <li><strong>Left Click:</strong> Reveal a cell</li>
-        <li><strong>Right Click:</strong> Place/remove a flag</li>
-        <li><strong>Goal:</strong> Reveal all cells without mines</li>
+        <li><strong>Desktop - Left Click / Mobile - Tap:</strong> Reveal a cell</li>
+        <li><strong>Desktop - Right Click / Mobile - Long Press:</strong> Place/remove a flag</li>
+        <li><strong>Goal:</strong> Reveal all cells without mines as fast as possible</li>
+<!--        <li><strong>Developer Mode:</strong> Type "SHOWMINES" or use Konami Code (↑↑↓↓←→←→BA) to reveal mine positions</li>-->
       </ul>
     </div>
   </div>

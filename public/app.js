@@ -7,6 +7,12 @@ let gameState = null;
 let flagsPlaced = 0;
 let timerInterval = null;
 let localStartTime = null;
+let developerMode = false;
+let keySequence = '';
+let arrowSequence = [];
+let minePositions = null;
+const SECRET_CODE = 'showmines'; // Text code
+const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']; // Konami code
 
 const boardElement = document.getElementById('board');
 const minesCountElement = document.getElementById('minesCount');
@@ -88,6 +94,13 @@ function createCell(row, col) {
   const isFlagged = gameState.flags[row][col];
   const value = gameState.values[row][col];
   const isHitMine = gameState.hitMineRow === row && gameState.hitMineCol === col;
+  const hasMine = minePositions && minePositions[row] && minePositions[row][col] === -1;
+  
+  // Developer mode: show mine indicator on unrevealed cells
+  if (developerMode && hasMine && !isRevealed) {
+    cell.classList.add('dev-mine');
+    cell.setAttribute('data-dev', '⚠️');
+  }
   
   if (isFlagged) {
     cell.classList.add('flagged');
@@ -113,6 +126,38 @@ function createCell(row, col) {
   cell.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     handleRightClick(row, col);
+  });
+  
+  // Touch support for mobile (long press to flag)
+  let touchTimer;
+  let touchMoved = false;
+  
+  cell.addEventListener('touchstart', (e) => {
+    touchMoved = false;
+    touchTimer = setTimeout(() => {
+      if (!touchMoved) {
+        // Long press detected
+        e.preventDefault();
+        handleRightClick(row, col);
+        // Vibrate if supported
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
+      }
+    }, 500); // 500ms long press
+  });
+  
+  cell.addEventListener('touchmove', () => {
+    touchMoved = true;
+    clearTimeout(touchTimer);
+  });
+  
+  cell.addEventListener('touchend', (e) => {
+    clearTimeout(touchTimer);
+    if (!touchMoved && e.cancelable) {
+      // Quick tap - don't let it trigger click event
+      // The click event will handle the reveal
+    }
   });
   
   return cell;
@@ -261,8 +306,12 @@ async function handleGameOver(won) {
       const playerName = prompt(`🎉 Congratulations! You won in ${formatTime(time)}!\n\nEnter your name for the leaderboard:`);
       
       if (playerName && playerName.trim()) {
-        await submitScore(playerName.trim(), time, difficulty);
-        alert('Score saved to leaderboard!');
+        const success = await submitScore(playerName.trim(), time, difficulty);
+        if (success) {
+          alert('Score saved to leaderboard!');
+        } else {
+          alert('⚠️ Score saved offline. It will sync when connection is restored.');
+        }
       }
       
       if (confirm('Start a new game?')) {
@@ -278,16 +327,107 @@ async function handleGameOver(won) {
   }
 }
 
+// Offline score queue management
+function getOfflineScores() {
+  const scores = localStorage.getItem('pendingScores');
+  return scores ? JSON.parse(scores) : [];
+}
+
+function addOfflineScore(name, time, difficulty) {
+  const scores = getOfflineScores();
+  scores.push({
+    name,
+    time,
+    difficulty,
+    date: new Date().toISOString(),
+    timestamp: Date.now()
+  });
+  localStorage.setItem('pendingScores', JSON.stringify(scores));
+}
+
+function clearOfflineScores() {
+  localStorage.removeItem('pendingScores');
+}
+
+function removeOfflineScore(index) {
+  const scores = getOfflineScores();
+  scores.splice(index, 1);
+  localStorage.setItem('pendingScores', JSON.stringify(scores));
+}
+
+// Sync pending scores to server
+async function syncOfflineScores() {
+  const pendingScores = getOfflineScores();
+  
+  if (pendingScores.length === 0) {
+    return { success: true, synced: 0 };
+  }
+  
+  console.log(`Syncing ${pendingScores.length} pending score(s)...`);
+  
+  let syncedCount = 0;
+  const failedIndices = [];
+  
+  for (let i = 0; i < pendingScores.length; i++) {
+    const score = pendingScores[i];
+    try {
+      const response = await fetch(`${API_URL}/leaderboard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: score.name,
+          time: score.time,
+          difficulty: score.difficulty,
+          date: score.date
+        })
+      });
+      
+      if (response.ok) {
+        syncedCount++;
+      } else {
+        failedIndices.push(i);
+      }
+    } catch (error) {
+      console.error('Error syncing score:', error);
+      failedIndices.push(i);
+    }
+  }
+  
+  // Keep only failed scores
+  const failedScores = pendingScores.filter((_, index) => failedIndices.includes(index));
+  localStorage.setItem('pendingScores', JSON.stringify(failedScores));
+  
+  if (syncedCount > 0) {
+    console.log(`✅ Successfully synced ${syncedCount} score(s)`);
+  }
+  
+  return { success: failedIndices.length === 0, synced: syncedCount, failed: failedIndices.length };
+}
+
 // Submit score to leaderboard
 async function submitScore(name, time, difficulty) {
   try {
-    await fetch(`${API_URL}/leaderboard`, {
+    const response = await fetch(`${API_URL}/leaderboard`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, time, difficulty })
+      body: JSON.stringify({ 
+        name, 
+        time, 
+        difficulty,
+        date: new Date().toISOString()
+      })
     });
+    
+    if (!response.ok) {
+      throw new Error('Server returned error');
+    }
+    
+    return true;
   } catch (error) {
-    console.error('Error submitting score:', error);
+    console.error('Error submitting score, saving offline:', error);
+    addOfflineScore(name, time, difficulty);
+    updateSyncIndicator();
+    return false;
   }
 }
 
@@ -384,5 +524,145 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
+// Check and sync pending scores on page load
+window.addEventListener('load', async () => {
+  const pendingScores = getOfflineScores();
+  if (pendingScores.length > 0) {
+    console.log(`Found ${pendingScores.length} pending score(s) to sync`);
+    const result = await syncOfflineScores();
+    if (result.synced > 0) {
+      console.log(`Synced ${result.synced} score(s) on page load`);
+    }
+    updateSyncIndicator();
+  }
+});
+
+// Listen for online event (when connection is restored)
+window.addEventListener('online', async () => {
+  console.log('Connection restored, syncing pending scores...');
+  const result = await syncOfflineScores();
+  if (result.synced > 0) {
+    alert(`✅ Synced ${result.synced} pending score(s) to leaderboard!`);
+  }
+  updateSyncIndicator();
+});
+
+// Listen for offline event
+window.addEventListener('offline', () => {
+  console.log('Connection lost. Scores will be saved offline.');
+});
+
+// Update sync indicator
+function updateSyncIndicator() {
+  const pendingScores = getOfflineScores();
+  const syncStatusElement = document.getElementById('syncStatus');
+  const syncTextElement = document.getElementById('syncText');
+  
+  if (pendingScores.length > 0) {
+    if (syncStatusElement) {
+      syncStatusElement.style.display = 'flex';
+      if (syncTextElement) {
+        syncTextElement.textContent = `${pendingScores.length} score(s) pending sync`;
+      }
+    }
+  } else {
+    if (syncStatusElement) {
+      syncStatusElement.style.display = 'none';
+    }
+  }
+}
+
+// Fetch mine positions for developer mode
+async function fetchMinePositions() {
+  if (!gameId) return;
+  
+  try {
+    const response = await fetch(`${API_URL}/game/${gameId}/dev`);
+    const data = await response.json();
+    minePositions = data.board;
+  } catch (error) {
+    console.error('Error fetching mine positions:', error);
+    minePositions = null;
+  }
+}
+
+// Secret code listener - Supports both "SHOWMINES" and Konami Code
+document.addEventListener('keydown', async (e) => {
+  let codeMatched = false;
+  
+  // Track text code (SHOWMINES)
+  if (e.key.length === 1 && e.key.match(/[a-z]/i)) {
+    keySequence += e.key.toLowerCase();
+    
+    // Keep only last length of secret code
+    if (keySequence.length > SECRET_CODE.length) {
+      keySequence = keySequence.slice(-SECRET_CODE.length);
+    }
+    
+    // Check if text sequence matches
+    if (keySequence === SECRET_CODE) {
+      codeMatched = true;
+      keySequence = ''; // Reset sequence
+    }
+  }
+  
+  // Track Konami code (arrow keys + b + a)
+  arrowSequence.push(e.key);
+  
+  // Keep only last 10 keys for Konami code
+  if (arrowSequence.length > KONAMI_CODE.length) {
+    arrowSequence.shift();
+  }
+  
+  // Check if Konami sequence matches
+  if (arrowSequence.length === KONAMI_CODE.length) {
+    const matches = arrowSequence.every((key, index) => key === KONAMI_CODE[index]);
+    if (matches) {
+      codeMatched = true;
+      arrowSequence = []; // Reset sequence
+    }
+  }
+  
+  // If either code matched, toggle developer mode
+  if (codeMatched) {
+    developerMode = !developerMode;
+    console.log(`🔓 Developer Mode: ${developerMode ? 'ON' : 'OFF'}`);
+    
+    if (developerMode) {
+      await fetchMinePositions();
+    } else {
+      minePositions = null;
+    }
+    
+    renderBoard(); // Re-render to show/hide mines
+    
+    // Show notification
+    const message = developerMode ? '🔓 Developer Mode ACTIVATED' : '🔒 Developer Mode DEACTIVATED';
+    showNotification(message);
+  }
+});
+
+// Show notification
+function showNotification(message) {
+  const notification = document.createElement('div');
+  notification.className = 'dev-notification';
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.classList.add('show');
+  }, 10);
+  
+  setTimeout(() => {
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 300);
+  }, 2000);
+}
+
 // Start the game when page loads
 startNewGame();
+
+// Update sync indicator on initial load
+setTimeout(() => {
+  updateSyncIndicator();
+}, 100);

@@ -336,8 +336,24 @@ app.get('/api/game/:gameId', (req, res) => {
   });
 });
 
+app.get('/api/game/:gameId/dev', (req, res) => {
+  const { gameId } = req.params;
+  const game = games.get(gameId);
+  
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  // Return full board including mine positions (for developer mode)
+  res.json({
+    board: game.board,
+    rows: game.rows,
+    cols: game.cols
+  });
+});
+
 app.post('/api/leaderboard', (req, res) => {
-  const { name, time, difficulty } = req.body;
+  const { name, time, difficulty, date } = req.body;
   
   if (!name || !time || !difficulty) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -347,7 +363,7 @@ app.post('/api/leaderboard', (req, res) => {
     name: name.substring(0, 20), // Limit name length
     time,
     difficulty,
-    date: new Date().toISOString()
+    date: date || new Date().toISOString() // Use provided date or current time
   };
 
   try {
