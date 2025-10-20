@@ -53,7 +53,7 @@ async function startNewGame() {
     startTimer();
   } catch (error) {
     console.error('Error starting new game:', error);
-    alert('Failed to connect to server. Make sure the server is running on port 3000.');
+    alert('Failed to connect to server. Make sure the server is running on port 3030.');
   }
 }
 
