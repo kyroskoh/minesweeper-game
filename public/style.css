@@ -174,8 +174,16 @@ h1 {
   border-color: #d32f2f;
 }
 
-.cell.revealed.mine {
+.cell.hit-mine {
+  background: #ff1744 !important;
+  border-color: #c51162 !important;
+  box-shadow: 0 0 15px rgba(255, 23, 68, 0.8);
   animation: explode 0.3s ease;
+}
+
+.cell.revealed.mine:not(.hit-mine) {
+  background: #e57373;
+  border-color: #ef5350;
 }
 
 @keyframes explode {

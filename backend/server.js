@@ -36,6 +36,8 @@ class MinesweeperGame {
     this.startTime = null;
     this.endTime = null;
     this.firstMove = true;
+    this.hitMineRow = null;
+    this.hitMineCol = null;
     this.initializeBoard();
   }
 
@@ -110,6 +112,8 @@ class MinesweeperGame {
     if (this.board[row][col] === -1) {
       this.gameOver = true;
       this.endTime = Date.now();
+      this.hitMineRow = row;
+      this.hitMineCol = col;
       this.revealAllMines();
       return { success: true, gameOver: true, won: false };
     }
@@ -186,7 +190,9 @@ class MinesweeperGame {
       won: this.won,
       minesCount: this.minesCount,
       elapsedTime: elapsedTime,
-      startTime: this.startTime
+      startTime: this.startTime,
+      hitMineRow: this.hitMineRow,
+      hitMineCol: this.hitMineCol
     };
   }
 

@@ -87,6 +87,7 @@ function createCell(row, col) {
   const isRevealed = gameState.revealed[row][col];
   const isFlagged = gameState.flags[row][col];
   const value = gameState.values[row][col];
+  const isHitMine = gameState.hitMineRow === row && gameState.hitMineCol === col;
   
   if (isFlagged) {
     cell.classList.add('flagged');
@@ -96,6 +97,10 @@ function createCell(row, col) {
     
     if (value === -1) {
       cell.classList.add('mine');
+      // Highlight the mine that was clicked
+      if (isHitMine) {
+        cell.classList.add('hit-mine');
+      }
       cell.textContent = '💣';
     } else if (value > 0) {
       cell.textContent = value;
@@ -183,6 +188,23 @@ function startTimer() {
   }
 }
 
+function formatTime(totalSeconds) {
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  
+  if (days > 0) {
+    return `${days}d ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  } else if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  } else if (minutes > 0) {
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  } else {
+    return `${seconds}s`;
+  }
+}
+
 function updateTimer() {
   if (!gameState || gameState.gameOver) {
     return;
@@ -191,7 +213,7 @@ function updateTimer() {
   // Use synchronized local start time for smooth counting
   if (localStartTime) {
     const elapsed = Math.floor((Date.now() - localStartTime) / 1000);
-    timerElement.textContent = `${elapsed}s`;
+    timerElement.textContent = formatTime(elapsed);
   }
 }
 
@@ -211,7 +233,7 @@ function updateGameInfo() {
   
   // Always update timer from server to avoid clock skew
   if (gameState.elapsedTime !== undefined) {
-    timerElement.textContent = `${gameState.elapsedTime}s`;
+    timerElement.textContent = formatTime(gameState.elapsedTime);
   }
   
   if (gameState.gameOver) {
@@ -231,7 +253,7 @@ async function handleGameOver(won) {
     const difficulty = difficulties[currentDifficulty].name;
     
     setTimeout(async () => {
-      const playerName = prompt(`🎉 Congratulations! You won in ${time} seconds!\n\nEnter your name for the leaderboard:`);
+      const playerName = prompt(`🎉 Congratulations! You won in ${formatTime(time)}!\n\nEnter your name for the leaderboard:`);
       
       if (playerName && playerName.trim()) {
         await submitScore(playerName.trim(), time, difficulty);
@@ -318,7 +340,7 @@ function displayLeaderboard(scores) {
       <tr>
         <td>${index + 1}</td>
         <td>${score.name}</td>
-        <td>${score.time}s</td>
+        <td>${formatTime(score.time)}</td>
         <td>${date}</td>
       </tr>
     `;
