@@ -51,6 +51,12 @@ async function startNewGame() {
     dailyPuzzleBadge.style.display = 'none';
   }
   
+  // Hide seed info
+  const seedInfo = document.getElementById('seedInfo');
+  if (seedInfo) {
+    seedInfo.style.display = 'none';
+  }
+  
   const config = difficulties[currentDifficulty];
   
   try {
@@ -101,6 +107,17 @@ async function startDailyPuzzle(difficulty) {
     previousGameState = null; // Reset comparison state
     flagsPlaced = 0;
     
+    // Store and display the seed
+    const dailySeed = data.seed;
+    
+    // Show seed in game info
+    const seedInfo = document.getElementById('seedInfo');
+    const seedValue = document.getElementById('seedValue');
+    if (seedInfo && seedValue) {
+      seedValue.textContent = dailySeed;
+      seedInfo.style.display = 'flex';
+    }
+    
     // Clear timer
     if (timerInterval) {
       clearInterval(timerInterval);
@@ -139,7 +156,7 @@ async function startDailyPuzzle(difficulty) {
       
       const badgeDateElement = document.getElementById('badgeDate');
       if (badgeDateElement) {
-        badgeDateElement.textContent = `${dateStr} • ${difficulties[difficulty].name} ${icon}`;
+        badgeDateElement.textContent = `${dateStr} • ${difficulties[difficulty].name} ${icon} • Seed: ${dailySeed}`;
       }
       dailyPuzzleBadge.style.display = 'flex';
     }
@@ -672,21 +689,24 @@ document.querySelectorAll('.daily-diff-card').forEach(card => {
 // Leaderboard functions
 let currentLeaderboardTab = 'Easy';
 
+let dailyLeaderboardData = {};
+let currentDailyDifficulty = 'all';
+
 async function loadLeaderboard(difficulty) {
   try {
     const response = await fetch(`${API_URL}/leaderboard`);
     const data = await response.json();
     
     if (difficulty === 'Daily') {
-      // Show all daily puzzle scores across all difficulties
-      const dailyScores = [];
+      // Group daily puzzle scores by difficulty (top 10 each)
+      dailyLeaderboardData = {};
       Object.keys(data.leaderboard).forEach(diff => {
         const scores = data.leaderboard[diff].filter(s => s.is_daily === 1);
-        dailyScores.push(...scores);
+        if (scores.length > 0) {
+          dailyLeaderboardData[diff] = scores.slice(0, 10); // Top 10 per difficulty
+        }
       });
-      // Sort by time
-      dailyScores.sort((a, b) => a.time - b.time);
-      displayLeaderboard(dailyScores.slice(0, 10), true);
+      displayDailyLeaderboard(currentDailyDifficulty);
     } else {
       displayLeaderboard(data.leaderboard[difficulty]);
     }
@@ -733,6 +753,160 @@ function displayLeaderboard(scores, showDifficulty = false) {
   
   html += '</tbody></table>';
   content.innerHTML = html;
+}
+
+function displayDailyLeaderboard(selectedDifficulty) {
+  const content = document.getElementById('leaderboardContent');
+  
+  // Check if there are any scores at all
+  const hasScores = Object.keys(dailyLeaderboardData).length > 0;
+  
+  if (!hasScores) {
+    content.innerHTML = '<div class="no-scores">No daily puzzle scores yet. Be the first!</div>';
+    return;
+  }
+  
+  // Difficulty icons mapping
+  const difficultyIcons = {
+    Easy: '🌱',
+    Medium: '⚡',
+    Hard: '🔥',
+    Pro: '💪',
+    Expert: '💎',
+    Extreme: '🚀'
+  };
+  
+  // Order of difficulties
+  const difficultyOrder = ['Easy', 'Medium', 'Hard', 'Pro', 'Expert', 'Extreme'];
+  
+  // Build difficulty selector
+  let html = '<div class="daily-difficulty-selector">';
+  
+  html += `<button class="daily-diff-filter ${selectedDifficulty === 'all' ? 'active' : ''}" data-diff="all">
+    📅 All Difficulties
+  </button>`;
+  
+  difficultyOrder.forEach(difficulty => {
+    if (dailyLeaderboardData[difficulty] && dailyLeaderboardData[difficulty].length > 0) {
+      const icon = difficultyIcons[difficulty] || '📅';
+      const count = dailyLeaderboardData[difficulty].length;
+      html += `
+        <button class="daily-diff-filter ${selectedDifficulty === difficulty ? 'active' : ''}" data-diff="${difficulty}">
+          ${icon} ${difficulty} <span class="filter-count">(${count})</span>
+        </button>
+      `;
+    }
+  });
+  
+  html += '</div>';
+  
+  // Display leaderboard based on selection
+  if (selectedDifficulty === 'all') {
+    // Show all difficulties grouped
+    html += '<div class="daily-leaderboard-grouped">';
+    
+    difficultyOrder.forEach(difficulty => {
+      const scores = dailyLeaderboardData[difficulty];
+      if (!scores || scores.length === 0) return;
+      
+      const icon = difficultyIcons[difficulty] || '📅';
+      
+      html += `
+        <div class="difficulty-group">
+          <div class="difficulty-group-header">
+            <span class="difficulty-icon">${icon}</span>
+            <span class="difficulty-name">${difficulty}</span>
+            <span class="difficulty-count">${scores.length} player${scores.length > 1 ? 's' : ''}</span>
+          </div>
+          <table class="leaderboard-table grouped">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>Time</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      
+      scores.forEach((score, index) => {
+        const date = new Date(score.date).toLocaleDateString();
+        html += `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${score.name}</td>
+            <td>${formatTimeWithTotal(score.time)}</td>
+            <td>${date}</td>
+          </tr>
+        `;
+      });
+      
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+    });
+    
+    html += '</div>';
+  } else {
+    // Show only selected difficulty
+    const scores = dailyLeaderboardData[selectedDifficulty];
+    if (!scores || scores.length === 0) {
+      html += '<div class="no-scores">No scores for this difficulty yet. Be the first!</div>';
+    } else {
+      const icon = difficultyIcons[selectedDifficulty] || '📅';
+      
+      html += `
+        <div class="daily-leaderboard-single">
+          <div class="single-difficulty-header">
+            <span class="diff-icon-large">${icon}</span>
+            <h3>${selectedDifficulty} Daily Challenge</h3>
+            <p class="subtitle">Top ${scores.length} player${scores.length > 1 ? 's' : ''} of the day</p>
+          </div>
+          <table class="leaderboard-table single">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>Time</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      
+      scores.forEach((score, index) => {
+        const date = new Date(score.date).toLocaleDateString();
+        html += `
+          <tr class="rank-${index + 1}">
+            <td>${index + 1}</td>
+            <td>${score.name}</td>
+            <td>${formatTimeWithTotal(score.time)}</td>
+            <td>${date}</td>
+          </tr>
+        `;
+      });
+      
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+  }
+  
+  content.innerHTML = html;
+  
+  // Add event listeners to filter buttons
+  document.querySelectorAll('.daily-diff-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const difficulty = btn.dataset.diff;
+      currentDailyDifficulty = difficulty;
+      displayDailyLeaderboard(difficulty);
+    });
+  });
 }
 
 function showLeaderboard() {

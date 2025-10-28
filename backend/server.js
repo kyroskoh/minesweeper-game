@@ -1,11 +1,14 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const initSqlJs = require('sql.js');
+const crypto = require('crypto');
 
 const app = express();
-const PORT = 3030;
+const PORT = process.env.PORT || 3030;
 
 app.use(cors());
 app.use(express.json());
@@ -392,14 +395,28 @@ class MinesweeperGame {
   }
 }
 
-// Get daily puzzle seed based on current date
-function getDailySeed() {
+// Secret salt for seed generation (keep this secret in production!)
+// In production, use environment variable: process.env.DAILY_SEED_SALT
+const SEED_SALT = process.env.DAILY_SEED_SALT || 'minesweeper-daily-puzzle-salt-2025';
+
+// Get daily puzzle seed based on current date and difficulty using cryptographic hashing
+function getDailySeed(difficulty = 'medium') {
   const today = new Date();
   const year = today.getUTCFullYear();
-  const month = today.getUTCMonth() + 1;
-  const day = today.getUTCDate();
-  // Create a unique seed for today
-  return year * 10000 + month * 100 + day;
+  const month = String(today.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(today.getUTCDate()).padStart(2, '0');
+  
+  // Create a string combining date, difficulty, and secret salt
+  const seedString = `${year}-${month}-${day}|${difficulty}|${SEED_SALT}`;
+  
+  // Generate SHA-256 hash
+  const hash = crypto.createHash('sha256').update(seedString).digest('hex');
+  
+  // Convert first 8 characters of hash to integer
+  // This gives us a large, unpredictable but deterministic number
+  const seed = parseInt(hash.substring(0, 8), 16);
+  
+  return seed;
 }
 
 // API Endpoints
@@ -417,7 +434,7 @@ app.post('/api/game/new', (req, res) => {
 
 app.post('/api/game/daily', (req, res) => {
   const { difficulty = 'medium' } = req.body;
-  const seed = getDailySeed();
+  const seed = getDailySeed(difficulty);
   
   // Daily puzzle configurations
   const dailyConfigs = {

@@ -149,6 +149,24 @@ h1 {
   color: #333;
 }
 
+#seedInfo {
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+  border-radius: 8px;
+  padding: 10px;
+  color: white;
+}
+
+#seedInfo .label {
+  color: white;
+  opacity: 0.95;
+}
+
+#seedInfo .value {
+  color: white;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+}
+
 .status {
   font-size: 1.2em;
   font-weight: bold;
@@ -717,6 +735,222 @@ h1 {
   font-style: italic;
 }
 
+/* Daily Leaderboard Difficulty Selector */
+.daily-difficulty-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 25px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 12px;
+}
+
+.daily-diff-filter {
+  padding: 10px 18px;
+  border: 2px solid #e0e0e0;
+  background: white;
+  color: #333;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.daily-diff-filter:hover {
+  border-color: #667eea;
+  background: #f0f0f0;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.daily-diff-filter.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: #667eea;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.filter-count {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.daily-diff-filter.active .filter-count {
+  opacity: 0.95;
+}
+
+/* Daily Leaderboard Grouped Display */
+.daily-leaderboard-grouped {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.difficulty-group {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 15px;
+  border: 2px solid #e0e0e0;
+  transition: all 0.3s ease;
+}
+
+.difficulty-group:hover {
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+}
+
+.difficulty-group-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 15px;
+  margin-bottom: 15px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.difficulty-icon {
+  font-size: 1.5em;
+  line-height: 1;
+}
+
+.difficulty-name {
+  font-size: 1.2em;
+  flex: 1;
+}
+
+.difficulty-count {
+  font-size: 0.9em;
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.leaderboard-table.grouped {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.leaderboard-table.grouped thead {
+  background: #667eea;
+  color: white;
+}
+
+.leaderboard-table.grouped th {
+  background: transparent;
+  color: white;
+  border-bottom: none;
+}
+
+.leaderboard-table.grouped tr:first-child td {
+  font-weight: 700;
+  background: linear-gradient(135deg, #fff9e6 0%, #ffe9a3 100%);
+}
+
+.leaderboard-table.grouped tr:nth-child(2) td {
+  background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+  font-weight: 600;
+}
+
+.leaderboard-table.grouped tr:nth-child(3) td {
+  background: linear-gradient(135deg, #fff4e6 0%, #ffd4a3 100%);
+  font-weight: 600;
+}
+
+/* Daily Leaderboard Single Difficulty View */
+.daily-leaderboard-single {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.single-difficulty-header {
+  text-align: center;
+  padding: 30px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.diff-icon-large {
+  font-size: 3.5em;
+  display: block;
+  margin-bottom: 15px;
+  animation: iconFloat 3s ease-in-out infinite;
+}
+
+.single-difficulty-header h3 {
+  font-size: 2em;
+  margin-bottom: 8px;
+  color: white;
+}
+
+.single-difficulty-header .subtitle {
+  font-size: 1em;
+  opacity: 0.9;
+  margin: 0;
+}
+
+.leaderboard-table.single {
+  width: 100%;
+}
+
+.leaderboard-table.single thead {
+  background: #f8f9fa;
+}
+
+.leaderboard-table.single th {
+  padding: 15px 12px;
+  font-weight: 700;
+  color: #333;
+}
+
+.leaderboard-table.single td {
+  padding: 15px 12px;
+}
+
+/* Top 3 highlighting for single view */
+.leaderboard-table.single tr.rank-1 td {
+  background: linear-gradient(135deg, #fff9e6 0%, #ffe9a3 100%);
+  font-weight: 700;
+  font-size: 1.05em;
+}
+
+.leaderboard-table.single tr.rank-1 td:first-child::before {
+  content: '🥇 ';
+}
+
+.leaderboard-table.single tr.rank-2 td {
+  background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+  font-weight: 700;
+}
+
+.leaderboard-table.single tr.rank-2 td:first-child::before {
+  content: '🥈 ';
+}
+
+.leaderboard-table.single tr.rank-3 td {
+  background: linear-gradient(135deg, #fff4e6 0%, #ffd4a3 100%);
+  font-weight: 600;
+}
+
+.leaderboard-table.single tr.rank-3 td:first-child::before {
+  content: '🥉 ';
+}
+
+.leaderboard-table.single tr:hover {
+  background: rgba(102, 126, 234, 0.05);
+}
+
 /* Developer Mode */
 .dev-mine {
   position: relative;
@@ -808,5 +1042,61 @@ h1 {
 
   .daily-badge {
     padding: 12px 20px;
+  }
+
+  .difficulty-group-header {
+    flex-wrap: wrap;
+    padding: 8px 12px;
+  }
+
+  .difficulty-icon {
+    font-size: 1.2em;
+  }
+
+  .difficulty-name {
+    font-size: 1em;
+  }
+
+  .difficulty-count {
+    font-size: 0.8em;
+    padding: 3px 10px;
+  }
+
+  .leaderboard-table.grouped th,
+  .leaderboard-table.grouped td {
+    padding: 8px 6px;
+    font-size: 0.85em;
+  }
+
+  .daily-difficulty-selector {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .daily-diff-filter {
+    padding: 8px 14px;
+    font-size: 0.8em;
+  }
+
+  .filter-count {
+    font-size: 0.75em;
+  }
+
+  .diff-icon-large {
+    font-size: 2.5em;
+  }
+
+  .single-difficulty-header h3 {
+    font-size: 1.5em;
+  }
+
+  .single-difficulty-header .subtitle {
+    font-size: 0.9em;
+  }
+
+  .leaderboard-table.single th,
+  .leaderboard-table.single td {
+    padding: 10px 8px;
+    font-size: 0.85em;
   }
 }

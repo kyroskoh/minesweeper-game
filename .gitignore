@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Environment Variables
+.env
+
 # Database
 leaderboard.db
 leaderboard.db-shm
