@@ -4,6 +4,7 @@ const API_URL = 'https://mine.kyros.party/api';
 
 let gameId = null;
 let gameState = null;
+let previousGameState = null;
 let flagsPlaced = 0;
 let timerInterval = null;
 let localStartTime = null;
@@ -12,6 +13,7 @@ let keySequence = '';
 let arrowSequence = [];
 let minePositions = null;
 let isDailyPuzzle = false;
+let isUpdating = false; // Prevent multiple simultaneous updates
 const SECRET_CODE = 'showmines'; // Text code
 const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']; // Konami code
 
@@ -54,6 +56,7 @@ async function startNewGame() {
     const data = await response.json();
     gameId = data.gameId;
     gameState = data.state;
+    previousGameState = null; // Reset comparison state
     flagsPlaced = 0;
     
     // Clear timer
@@ -88,6 +91,7 @@ async function startDailyPuzzle(difficulty) {
     const data = await response.json();
     gameId = data.gameId;
     gameState = data.state;
+    previousGameState = null; // Reset comparison state
     flagsPlaced = 0;
     
     // Clear timer
@@ -113,7 +117,7 @@ async function startDailyPuzzle(difficulty) {
   }
 }
 
-// Render the game board
+// Render the game board (initial full render)
 function renderBoard() {
   if (!gameState) return;
   
@@ -141,6 +145,64 @@ function renderBoard() {
       boardElement.appendChild(cell);
     }
   }
+}
+
+// Update cells efficiently (only changed cells)
+function updateCells() {
+  if (!gameState) return;
+  
+  // Use requestAnimationFrame for smoother rendering
+  requestAnimationFrame(() => {
+    const cells = boardElement.querySelectorAll('.cell');
+    
+    for (let i = 0; i < gameState.rows; i++) {
+      for (let j = 0; j < gameState.cols; j++) {
+        // Skip unchanged cells
+        if (previousGameState && 
+            gameState.revealed[i][j] === previousGameState.revealed[i][j] &&
+            gameState.flags[i][j] === previousGameState.flags[i][j]) {
+          continue;
+        }
+        
+        const index = i * gameState.cols + j;
+        const cell = cells[index];
+        if (!cell) continue;
+        
+        const isRevealed = gameState.revealed[i][j];
+        const isFlagged = gameState.flags[i][j];
+        const value = gameState.values[i][j];
+        const isHitMine = gameState.hitMineRow === i && gameState.hitMineCol === j;
+        
+        // Clear previous state
+        cell.className = 'cell';
+        cell.textContent = '';
+        
+        if (isFlagged) {
+          cell.classList.add('flagged');
+          cell.textContent = '🚩';
+        } else if (isRevealed) {
+          cell.classList.add('revealed');
+          
+          if (value === -1) {
+            cell.classList.add('mine');
+            if (isHitMine) {
+              cell.classList.add('hit-mine');
+            }
+            cell.textContent = '💣';
+          } else if (value > 0) {
+            cell.textContent = value;
+            cell.classList.add(`cell-${value}`);
+          }
+        }
+      }
+    }
+    
+    // Store current state for next comparison
+    previousGameState = {
+      revealed: gameState.revealed.map(row => [...row]),
+      flags: gameState.flags.map(row => [...row])
+    };
+  });
 }
 
 // Create a single cell
@@ -225,7 +287,9 @@ function createCell(row, col) {
 
 // Handle left click (reveal cell)
 async function handleCellClick(row, col) {
-  if (!gameId || gameState.gameOver || gameState.flags[row][col]) return;
+  if (!gameId || gameState.gameOver || gameState.flags[row][col] || isUpdating) return;
+  
+  isUpdating = true;
   
   try {
     const response = await fetch(`${API_URL}/game/${gameId}/reveal`, {
@@ -237,7 +301,8 @@ async function handleCellClick(row, col) {
     const data = await response.json();
     gameState = data.state;
     
-    renderBoard();
+    // Use partial update instead of full re-render
+    updateCells();
     updateGameInfo();
     
     // Synchronize local timer with server time
@@ -253,12 +318,16 @@ async function handleCellClick(row, col) {
     }
   } catch (error) {
     console.error('Error revealing cell:', error);
+  } finally {
+    isUpdating = false;
   }
 }
 
 // Handle right click (toggle flag)
 async function handleRightClick(row, col) {
-  if (!gameId || gameState.gameOver || gameState.revealed[row][col]) return;
+  if (!gameId || gameState.gameOver || gameState.revealed[row][col] || isUpdating) return;
+  
+  isUpdating = true;
   
   try {
     const response = await fetch(`${API_URL}/game/${gameId}/flag`, {
@@ -278,10 +347,13 @@ async function handleRightClick(row, col) {
       }
     }
     
-    renderBoard();
+    // Use partial update instead of full re-render
+    updateCells();
     updateGameInfo();
   } catch (error) {
     console.error('Error toggling flag:', error);
+  } finally {
+    isUpdating = false;
   }
 }
 

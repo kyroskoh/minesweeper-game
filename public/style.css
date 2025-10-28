@@ -154,6 +154,7 @@ h1 {
   display: grid;
   max-width: 100%;
   overflow: auto;
+  contain: layout;
 }
 
 .cell {
@@ -168,8 +169,10 @@ h1 {
   cursor: pointer;
   font-weight: bold;
   font-size: 0.9em;
-  transition: all 0.1s ease;
+  transition: background-color 0.1s ease, transform 0.1s ease;
   user-select: none;
+  will-change: background-color, transform;
+  contain: layout style paint;
 }
 
 /* Dynamic cell sizing for larger boards */
