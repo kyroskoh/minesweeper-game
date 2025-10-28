@@ -29,6 +29,7 @@ const closeModal = document.querySelector('.close');
 const dailyPuzzleBtn = document.getElementById('dailyPuzzleBtn');
 const dailyPuzzleModal = document.getElementById('dailyPuzzleModal');
 const closeDailyModal = document.querySelector('.close-daily');
+const dailyPuzzleBadge = document.getElementById('dailyPuzzleBadge');
 
 const difficulties = {
   easy: { rows: 10, cols: 10, mines: 10, name: 'Easy' },
@@ -44,6 +45,12 @@ let currentDifficulty = 'medium';
 // Initialize game
 async function startNewGame() {
   isDailyPuzzle = false;
+  
+  // Hide daily puzzle badge
+  if (dailyPuzzleBadge) {
+    dailyPuzzleBadge.style.display = 'none';
+  }
+  
   const config = difficulties[currentDifficulty];
   
   try {
@@ -109,6 +116,33 @@ async function startDailyPuzzle(difficulty) {
     // Update difficulty button states
     document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(difficulty)?.classList.add('active');
+    
+    // Show daily puzzle badge with today's date
+    if (dailyPuzzleBadge) {
+      const today = new Date();
+      const dateStr = today.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+      
+      // Get difficulty icon
+      const difficultyIcons = {
+        easy: '🌱',
+        medium: '⚡',
+        hard: '🔥',
+        pro: '💪',
+        expert: '💎',
+        extreme: '🚀'
+      };
+      const icon = difficultyIcons[difficulty] || '📅';
+      
+      const badgeDateElement = document.getElementById('badgeDate');
+      if (badgeDateElement) {
+        badgeDateElement.textContent = `${dateStr} • ${difficulties[difficulty].name} ${icon}`;
+      }
+      dailyPuzzleBadge.style.display = 'flex';
+    }
     
     hideDailyPuzzleModal();
   } catch (error) {
@@ -423,8 +457,11 @@ function updateGameInfo() {
     gameStatusElement.className = gameState.won ? 'status won' : 'status lost';
     stopTimer();
   } else {
-    gameStatusElement.textContent = 'Playing';
+    gameStatusElement.textContent = isDailyPuzzle ? '📅 Playing Daily' : 'Playing';
     gameStatusElement.className = 'status';
+    if (isDailyPuzzle) {
+      gameStatusElement.classList.add('daily');
+    }
   }
 }
 
@@ -593,6 +630,20 @@ newGameBtn.addEventListener('click', startNewGame);
 
 // Daily puzzle modal functions
 function showDailyPuzzleModal() {
+  // Update date displays
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-US', { 
+    weekday: 'long',
+    month: 'long', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+  
+  const modalDate = document.getElementById('dailyModalDate');
+  if (modalDate) {
+    modalDate.textContent = dateStr;
+  }
+  
   dailyPuzzleModal.classList.add('show');
 }
 
@@ -610,10 +661,10 @@ window.addEventListener('click', (e) => {
   }
 });
 
-// Daily difficulty buttons
-document.querySelectorAll('.daily-diff-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const difficulty = btn.dataset.difficulty;
+// Daily difficulty cards
+document.querySelectorAll('.daily-diff-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const difficulty = card.dataset.difficulty;
     startDailyPuzzle(difficulty);
   });
 });

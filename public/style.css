@@ -85,7 +85,30 @@ h1 {
 }
 
 .daily-puzzle-btn {
-  background: #FF6B6B;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+  z-index: 1;
+}
+
+.daily-puzzle-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+  z-index: -1;
+}
+
+.daily-puzzle-btn:hover::before {
+  width: 300px;
+  height: 300px;
 }
 
 .new-game-btn:hover {
@@ -94,8 +117,8 @@ h1 {
 }
 
 .daily-puzzle-btn:hover {
-  background: #EE5A5A;
   transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.5);
 }
 
 .game-info {
@@ -280,7 +303,94 @@ h1 {
   position: absolute;
   left: 0;
   color: #667eea;
+}
+
+/* Daily Puzzle Badge */
+.daily-badge {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 15px auto;
+  padding: 16px 28px;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+  color: white;
   font-weight: bold;
+  border-radius: 30px;
+  box-shadow: 0 4px 20px rgba(255, 107, 107, 0.5);
+  max-width: fit-content;
+  position: relative;
+  overflow: hidden;
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+.badge-icon {
+  font-size: 1.8em;
+  animation: iconFloat 3s ease-in-out infinite;
+}
+
+.badge-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.badge-title {
+  font-size: 1.2em;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.badge-date {
+  font-size: 0.85em;
+  opacity: 0.95;
+  font-weight: 500;
+}
+
+.badge-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+  opacity: 0;
+  animation: pulseWave 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 20px rgba(255, 107, 107, 0.5);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 6px 25px rgba(255, 107, 107, 0.7);
+  }
+}
+
+@keyframes iconFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes pulseWave {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
 }
 
 .sync-status {
@@ -339,28 +449,154 @@ h1 {
   align-items: center;
 }
 
+/* Daily Modal Styles */
+.daily-modal {
+  max-width: 700px;
+}
+
+.daily-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.daily-icon {
+  font-size: 4em;
+  margin-bottom: 10px;
+  animation: iconBounce 2s ease-in-out infinite;
+}
+
+@keyframes iconBounce {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.daily-header h2 {
+  margin: 10px 0;
+  font-size: 2.2em;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.daily-date {
+  font-size: 1.2em;
+  color: #666;
+  font-weight: 600;
+  margin: 5px 0 10px 0;
+}
+
+.daily-tagline {
+  font-size: 0.9em;
+  color: #999;
+  font-style: italic;
+  margin-top: 10px;
+}
+
 .daily-difficulty {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
   margin-top: 20px;
 }
 
-.daily-diff-btn {
-  padding: 12px 20px;
-  background: #FF6B6B;
-  color: white;
-  border: none;
-  border-radius: 8px;
+.daily-diff-card {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
   cursor: pointer;
-  font-size: 1em;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.daily-diff-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, #FF6B6B, #FF8E53);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.daily-diff-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  border-color: #FF6B6B;
+}
+
+.daily-diff-card:hover::before {
+  transform: scaleX(1);
+}
+
+.difficulty-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.diff-icon {
+  font-size: 2em;
+}
+
+.diff-name {
+  font-size: 1.3em;
+  font-weight: 700;
+  color: #333;
+}
+
+.diff-details {
+  font-size: 0.9em;
+  color: #666;
+  margin-bottom: 15px;
+  padding-left: 10px;
+}
+
+.diff-play-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+  color: white;
+  border-radius: 20px;
   font-weight: 600;
+  font-size: 0.9em;
   transition: all 0.3s ease;
 }
 
-.daily-diff-btn:hover {
-  background: #EE5A5A;
+.daily-diff-card:hover .diff-play-btn {
   transform: translateX(5px);
+  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+}
+
+.daily-diff-card.completed {
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border-color: #4CAF50;
+}
+
+.daily-diff-card.completed::before {
+  background: linear-gradient(90deg, #4CAF50, #66BB6A);
+}
+
+.daily-diff-card.completed::after {
+  content: '✓';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 1.5em;
+  color: #4CAF50;
+  font-weight: bold;
 }
 
 .modal.show {
@@ -392,7 +628,7 @@ h1 {
   }
 }
 
-.close {
+.close, .close-daily {
   position: absolute;
   right: 20px;
   top: 20px;
@@ -403,7 +639,7 @@ h1 {
   transition: color 0.3s ease;
 }
 
-.close:hover {
+.close:hover, .close-daily:hover {
   color: #333;
 }
 
@@ -517,4 +753,60 @@ h1 {
 .dev-notification.show {
   transform: translateX(-50%) translateY(0);
   opacity: 1;
+}
+
+/* Responsive Design for Daily Puzzle UI */
+@media (max-width: 768px) {
+  .daily-modal {
+    max-width: 95%;
+    padding: 20px;
+  }
+
+  .daily-icon {
+    font-size: 3em;
+  }
+
+  .daily-header h2 {
+    font-size: 1.8em;
+  }
+
+  .daily-date {
+    font-size: 1em;
+  }
+
+  .daily-tagline {
+    font-size: 0.8em;
+  }
+
+  .daily-difficulty {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-diff-card {
+    padding: 15px;
+  }
+
+  .diff-icon {
+    font-size: 1.5em;
+  }
+
+  .diff-name {
+    font-size: 1.1em;
+  }
+
+  .badge-icon {
+    font-size: 1.5em;
+  }
+
+  .badge-title {
+    font-size: 1em;
+  }
+
+  .badge-date {
+    font-size: 0.75em;
+  }
+
+  .daily-badge {
+    padding: 12px 20px;
+  }
 }
