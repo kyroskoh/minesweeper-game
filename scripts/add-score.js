@@ -4,29 +4,42 @@ const fs = require('fs');
 const path = require('path');
 const initSqlJs = require('sql.js');
 
-const VALID_DIFFICULTIES = ['Easy', 'Medium', 'Hard', 'Expert', 'Extreme'];
+const VALID_DIFFICULTIES = ['Easy', 'Medium', 'Hard', 'Pro', 'Expert', 'Extreme'];
 
 async function addScore() {
   // Parse command line arguments
   const args = process.argv.slice(2);
   
   if (args.length < 3) {
-    console.error('\n❌ Usage: node scripts/add-score.js <name> <time> <difficulty> [date]');
+    console.error('\n❌ Usage: node scripts/add-score.js <name> <time> <difficulty> [date] [--daily]');
     console.log('\nExamples:');
     console.log('  node scripts/add-score.js "John Doe" 45 Easy');
     console.log('  node scripts/add-score.js "Jane Smith" 120 Medium');
     console.log('  node scripts/add-score.js "Pro Player" 3:45 Hard "2025-10-15"');
     console.log('  node scripts/add-score.js "Speed Runner" 2:30 Expert "10/15/2025"');
-    console.log('\nValid difficulties: Easy, Medium, Hard, Expert, Extreme');
+    console.log('  node scripts/add-score.js "Daily Winner" 90 Pro --daily');
+    console.log('  node scripts/add-score.js "Champion" 5:30 Extreme "2025-10-15" --daily');
+    console.log('\nValid difficulties: Easy, Medium, Hard, Pro, Expert, Extreme');
     console.log('Time can be in seconds (e.g., 45) or mm:ss format (e.g., 3:45)');
     console.log('Date is optional (defaults to today). Formats: YYYY-MM-DD, MM/DD/YYYY, or any valid date string');
+    console.log('Use --daily flag to mark this as a daily puzzle score');
     process.exit(1);
   }
 
   const name = args[0].trim();
   const timeInput = args[1].trim();
   const difficulty = args[2].trim();
-  const dateInput = args[3] ? args[3].trim() : null;
+  
+  // Check for --daily flag in any position after difficulty
+  const dailyFlagIndex = args.slice(3).findIndex(arg => arg === '--daily');
+  const isDailyPuzzle = dailyFlagIndex !== -1;
+  
+  // Get date from args, excluding --daily flag
+  let dateInput = null;
+  const remainingArgs = args.slice(3).filter(arg => arg !== '--daily');
+  if (remainingArgs.length > 0) {
+    dateInput = remainingArgs[0].trim();
+  }
 
   // Validate name
   if (!name || name.length === 0) {
@@ -140,6 +153,7 @@ async function addScore() {
   console.log(`   Name: ${name}`);
   console.log(`   Time: ${formatTimeWithTotal(timeInSeconds)}`);
   console.log(`   Difficulty: ${difficulty}`);
+  console.log(`   Type: ${isDailyPuzzle ? '📅 Daily Puzzle' : '🎮 Regular Game'}`);
   console.log(`   Date: ${new Date(date).toLocaleDateString()}`);
 
   // Initialize database
@@ -158,10 +172,10 @@ async function addScore() {
     
     const db = new SQL.Database(buffer);
     
-    // Insert the score
+    // Insert the score with is_daily flag
     db.run(
-      'INSERT INTO leaderboard (name, time, difficulty, date) VALUES (?, ?, ?, ?)',
-      [name, timeInSeconds, difficulty, date]
+      'INSERT INTO leaderboard (name, time, difficulty, date, is_daily) VALUES (?, ?, ?, ?, ?)',
+      [name, timeInSeconds, difficulty, date, isDailyPuzzle ? 1 : 0]
     );
     
     // Save database
@@ -172,15 +186,16 @@ async function addScore() {
     
     console.log('✅ Score added successfully!');
     
-    // Show current top 5 for this difficulty
+    // Show current top 5 for this difficulty (filtered by daily/regular)
     const SQL2 = await initSqlJs();
     const db2 = new SQL.Database(fs.readFileSync(dbPath));
     const stmt = db2.prepare(
-      'SELECT name, time FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 5'
+      'SELECT name, time FROM leaderboard WHERE difficulty = ? AND is_daily = ? ORDER BY time ASC LIMIT 5'
     );
-    stmt.bind([difficulty]);
+    stmt.bind([difficulty, isDailyPuzzle ? 1 : 0]);
     
-    console.log(`\n🏆 Top 5 - ${difficulty}:`);
+    const scoreType = isDailyPuzzle ? '📅 Daily Puzzle' : '🎮 Regular';
+    console.log(`\n🏆 Top 5 - ${difficulty} (${scoreType}):`);
     let rank = 1;
     while (stmt.step()) {
       const row = stmt.getAsObject();
