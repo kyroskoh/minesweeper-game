@@ -128,16 +128,13 @@ class MinesweeperGame {
       }
     }
 
-    // Place mines randomly
-    let minesPlaced = 0;
-    while (minesPlaced < this.minesCount) {
-      const row = Math.floor(Math.random() * this.rows);
-      const col = Math.floor(Math.random() * this.cols);
-      
-      if (this.board[row][col] !== -1) {
-        this.board[row][col] = -1; // -1 represents a mine
-        minesPlaced++;
-      }
+    // Determine if this is a high difficulty (hard, expert, extreme)
+    const isHighDifficulty = (this.rows >= 15 && this.cols >= 15 && this.minesCount >= 35);
+    
+    if (isHighDifficulty) {
+      this.placeMinesSolvable();
+    } else {
+      this.placeMinesRandom();
     }
 
     // Calculate numbers for non-mine cells
@@ -148,6 +145,110 @@ class MinesweeperGame {
         }
       }
     }
+  }
+
+  placeMinesRandom() {
+    // Place mines randomly (for easy and medium)
+    let minesPlaced = 0;
+    while (minesPlaced < this.minesCount) {
+      const row = Math.floor(Math.random() * this.rows);
+      const col = Math.floor(Math.random() * this.cols);
+      
+      if (this.board[row][col] !== -1) {
+        this.board[row][col] = -1;
+        minesPlaced++;
+      }
+    }
+  }
+
+  placeMinesSolvable() {
+    // Place mines in clusters to create higher numbers (4, 5, 6) for logical solving
+    let minesPlaced = 0;
+    const clusterSize = 3; // Mines per cluster
+    const numClusters = Math.ceil(this.minesCount / clusterSize);
+    
+    for (let cluster = 0; cluster < numClusters && minesPlaced < this.minesCount; cluster++) {
+      // Pick a random center point for the cluster
+      const centerRow = Math.floor(Math.random() * this.rows);
+      const centerCol = Math.floor(Math.random() * this.cols);
+      
+      // Place mines in a cluster pattern around the center
+      const offsets = [
+        [0, 0], [-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]
+      ];
+      
+      // Shuffle offsets for variety
+      for (let i = offsets.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [offsets[i], offsets[j]] = [offsets[j], offsets[i]];
+      }
+      
+      let clusterMinesPlaced = 0;
+      for (const [dRow, dCol] of offsets) {
+        if (minesPlaced >= this.minesCount || clusterMinesPlaced >= clusterSize) break;
+        
+        const row = centerRow + dRow;
+        const col = centerCol + dCol;
+        
+        if (this.isValidCell(row, col) && this.board[row][col] !== -1) {
+          this.board[row][col] = -1;
+          minesPlaced++;
+          clusterMinesPlaced++;
+        }
+      }
+    }
+    
+    // Fill remaining mines with strategic placement
+    let attempts = 0;
+    const maxAttempts = this.rows * this.cols * 2;
+    
+    while (minesPlaced < this.minesCount && attempts < maxAttempts) {
+      attempts++;
+      const row = Math.floor(Math.random() * this.rows);
+      const col = Math.floor(Math.random() * this.cols);
+      
+      if (this.board[row][col] !== -1) {
+        // Check if placing here would create interesting numbers nearby
+        const adjacentMines = this.countAdjacentMinesTemp(row, col);
+        
+        // Prefer positions that will create cells with 2-5 adjacent mines
+        if (adjacentMines >= 1 && adjacentMines <= 4) {
+          this.board[row][col] = -1;
+          minesPlaced++;
+        } else if (Math.random() < 0.3) {
+          // 30% chance to place anyway for variety
+          this.board[row][col] = -1;
+          minesPlaced++;
+        }
+      }
+    }
+    
+    // If still not enough mines, place remaining randomly
+    while (minesPlaced < this.minesCount) {
+      const row = Math.floor(Math.random() * this.rows);
+      const col = Math.floor(Math.random() * this.cols);
+      
+      if (this.board[row][col] !== -1) {
+        this.board[row][col] = -1;
+        minesPlaced++;
+      }
+    }
+  }
+
+  countAdjacentMinesTemp(row, col) {
+    // Temporary count used during mine placement
+    let count = 0;
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        if (i === 0 && j === 0) continue;
+        const newRow = row + i;
+        const newCol = col + j;
+        if (this.isValidCell(newRow, newCol) && this.board[newRow][newCol] === -1) {
+          count++;
+        }
+      }
+    }
+    return count;
   }
 
   countAdjacentMines(row, col) {
