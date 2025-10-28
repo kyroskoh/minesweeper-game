@@ -235,6 +235,155 @@ CREATE TABLE leaderboard (
 - `date` - ISO 8601 date string
 - `is_daily` - 0 for regular games, 1 for daily puzzles
 
+## Score Migration Tool
+
+### Overview
+The `migrate-scores.js` script helps fix scores that were incorrectly categorized as daily or regular due to bugs. It allows you to move scores between these categories.
+
+### Usage
+
+```bash
+node scripts/migrate-scores.js
+```
+
+### Features
+
+#### 1. View All Scores
+Shows all scores grouped by type (Regular/Daily):
+```
+📊 Current Scores:
+
+🎮 REGULAR GAME SCORES:
+──────────────────────────────────────────────────────────────────────
+  [ID:1] Player1 - 01m30s (Easy) - 10/28/2025
+  [ID:3] Player2 - 02m15s (Medium) - 10/28/2025
+
+📅 DAILY PUZZLE SCORES:
+──────────────────────────────────────────────────────────────────────
+  [ID:2] Player3 - 03m00s (Hard) - 10/28/2025
+```
+
+#### 2. Move Regular to Daily
+Migrates regular game scores to daily puzzle category:
+```bash
+# Select from menu option 2
+# Choose specific scores or "all"
+```
+
+#### 3. Move Daily to Regular
+Migrates daily puzzle scores to regular game category:
+```bash
+# Select from menu option 3
+```
+
+#### 4. Move by Score ID
+Migrate a specific score by its database ID:
+```bash
+# Select menu option 4
+# Enter the score ID
+```
+
+#### 5. Move by Name and Date
+Find and migrate scores by player name and/or date:
+```bash
+# Select menu option 5
+# Enter player name (partial matches work)
+# Optionally filter by date (YYYY-MM-DD)
+```
+
+### Examples
+
+#### Migrate All Regular Scores to Daily
+```bash
+$ node scripts/migrate-scores.js
+Select an operation:
+  1) View all scores (grouped by type)
+  2) Move scores from Regular to Daily
+  3) Move scores from Daily to Regular
+  4) Move specific score by ID
+  5) Move scores by name and date
+  6) Exit
+
+Enter your choice (1-6): 2
+
+Found 5 Regular score(s):
+
+  1) [ID:10] John Doe - 01m30s (Easy) - 10/28/2025
+  2) [ID:11] Jane Smith - 02m00s (Medium) - 10/28/2025
+  ...
+
+Enter your selection: all
+
+Proceed with migration? (yes/no): yes
+
+✅ Successfully migrated 5 score(s)!
+```
+
+#### Migrate Specific Scores
+```bash
+Enter your selection: 1,3,5
+
+⚠️  About to migrate 3 score(s) from Regular to Daily:
+  • John Doe - 01m30s (Easy) - 10/28/2025
+  • Bob Wilson - 03m00s (Hard) - 10/28/2025
+  • Alice Brown - 05m30s (Expert) - 10/28/2025
+
+Proceed with migration? (yes/no): yes
+```
+
+#### Migrate by Name
+```bash
+Enter player name (or partial name): John
+Enter date (YYYY-MM-DD) or leave empty for all dates: 
+
+Found 3 matching score(s):
+
+  1) [ID:10] John Doe - 01m30s (Easy) - 10/28/2025 - 🎮 Regular
+  2) [ID:15] Johnny - 02m00s (Medium) - 10/27/2025 - 📅 Daily
+  3) [ID:20] John Smith - 03m00s (Hard) - 10/26/2025 - 🎮 Regular
+
+Selection: 1,3
+```
+
+### Selection Syntax
+
+- **Single scores**: `1` or `1,3,5`
+- **Range**: `1-5` (migrates scores 1 through 5)
+- **All**: `all` (migrates all listed scores)
+- **Cancel**: `cancel` (abort operation)
+
+### Safety Features
+
+- ✅ Shows preview before migration
+- ✅ Requires confirmation
+- ✅ Displays score details
+- ✅ Shows old and new type
+- ✅ Creates backup automatically
+
+### Common Use Cases
+
+#### Fix Yesterday's Daily Puzzle Scores
+If scores were accidentally marked as regular:
+```bash
+# Option 5: Move by name and date
+# Enter date: 2025-10-27
+# Select all matching scores
+```
+
+#### Fix Regular Scores Marked as Daily
+If someone's regular games were marked as daily:
+```bash
+# Option 3: Move Daily to Regular
+# Enter their score numbers
+```
+
+#### Bulk Migration
+Move all scores of a certain type:
+```bash
+# Option 2 or 3
+# Enter: all
+```
+
 ## Troubleshooting
 
 ### Database not found

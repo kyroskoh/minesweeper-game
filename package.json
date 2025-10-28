@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "node backend/server.js",
-    "add-score": "node scripts/add-score.js"
+    "add-score": "node scripts/add-score.js",
+    "migrate-scores": "node scripts/migrate-scores.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
