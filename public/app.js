@@ -11,6 +11,7 @@ let developerMode = false;
 let keySequence = '';
 let arrowSequence = [];
 let minePositions = null;
+let isDailyPuzzle = false;
 const SECRET_CODE = 'showmines'; // Text code
 const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']; // Konami code
 
@@ -23,19 +24,24 @@ const newGameBtn = document.getElementById('newGame');
 const leaderboardBtn = document.getElementById('leaderboardBtn');
 const leaderboardModal = document.getElementById('leaderboardModal');
 const closeModal = document.querySelector('.close');
+const dailyPuzzleBtn = document.getElementById('dailyPuzzleBtn');
+const dailyPuzzleModal = document.getElementById('dailyPuzzleModal');
+const closeDailyModal = document.querySelector('.close-daily');
 
 const difficulties = {
-  easy: { rows: 8, cols: 8, mines: 10, name: 'Easy' },
-  medium: { rows: 10, cols: 10, mines: 15, name: 'Medium' },
-  hard: { rows: 15, cols: 15, mines: 35, name: 'Hard' },
-  expert: { rows: 18, cols: 18, mines: 60, name: 'Expert' },
-  extreme: { rows: 20, cols: 20, mines: 80, name: 'Extreme' }
+  easy: { rows: 10, cols: 10, mines: 10, name: 'Easy' },
+  medium: { rows: 15, cols: 15, mines: 25, name: 'Medium' },
+  hard: { rows: 20, cols: 20, mines: 40, name: 'Hard' },
+  pro: { rows: 30, cols: 30, mines: 50, name: 'Pro' },
+  expert: { rows: 40, cols: 40, mines: 100, name: 'Expert' },
+  extreme: { rows: 50, cols: 50, mines: 150, name: 'Extreme' }
 };
 
 let currentDifficulty = 'medium';
 
 // Initialize game
 async function startNewGame() {
+  isDailyPuzzle = false;
   const config = difficulties[currentDifficulty];
   
   try {
@@ -67,13 +73,67 @@ async function startNewGame() {
   }
 }
 
+// Start daily puzzle
+async function startDailyPuzzle(difficulty) {
+  isDailyPuzzle = true;
+  currentDifficulty = difficulty;
+  
+  try {
+    const response = await fetch(`${API_URL}/game/daily`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ difficulty })
+    });
+    
+    const data = await response.json();
+    gameId = data.gameId;
+    gameState = data.state;
+    flagsPlaced = 0;
+    
+    // Clear timer
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    localStartTime = null;
+    timerElement.textContent = '0s';
+    
+    renderBoard();
+    updateGameInfo();
+    startTimer();
+    
+    // Update difficulty button states
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(difficulty)?.classList.add('active');
+    
+    hideDailyPuzzleModal();
+  } catch (error) {
+    console.error('Error starting daily puzzle:', error);
+    alert('Failed to connect to server. Make sure the server is running on port 3030.');
+  }
+}
+
 // Render the game board
 function renderBoard() {
   if (!gameState) return;
   
   boardElement.innerHTML = '';
-  boardElement.style.gridTemplateColumns = `repeat(${gameState.cols}, 30px)`;
-  boardElement.style.gridTemplateRows = `repeat(${gameState.rows}, 30px)`;
+  
+  // Dynamic cell size based on board dimensions
+  let cellSize = 30;
+  if (gameState.rows >= 50 || gameState.cols >= 50) {
+    cellSize = 15;
+  } else if (gameState.rows >= 40 || gameState.cols >= 40) {
+    cellSize = 18;
+  } else if (gameState.rows >= 30 || gameState.cols >= 30) {
+    cellSize = 20;
+  } else if (gameState.rows >= 20 || gameState.cols >= 20) {
+    cellSize = 25;
+  }
+  
+  boardElement.style.gridTemplateColumns = `repeat(${gameState.cols}, ${cellSize}px)`;
+  boardElement.style.gridTemplateRows = `repeat(${gameState.rows}, ${cellSize}px)`;
+  boardElement.dataset.cellSize = cellSize;
   
   for (let i = 0; i < gameState.rows; i++) {
     for (let j = 0; j < gameState.cols; j++) {
@@ -301,12 +361,13 @@ async function handleGameOver(won) {
   if (won) {
     const time = gameState.elapsedTime;
     const difficulty = difficulties[currentDifficulty].name;
+    const puzzleType = isDailyPuzzle ? 'Daily Puzzle' : difficulty;
     
     setTimeout(async () => {
-      const playerName = prompt(`🎉 Congratulations! You won in ${formatTime(time)}!\n\nEnter your name for the leaderboard:`);
+      const playerName = prompt(`🎉 Congratulations! You won the ${puzzleType} in ${formatTime(time)}!\n\nEnter your name for the leaderboard:`);
       
       if (playerName && playerName.trim()) {
-        const success = await submitScore(playerName.trim(), time, difficulty);
+        const success = await submitScore(playerName.trim(), time, difficulty, isDailyPuzzle);
         if (success) {
           alert('Score saved to leaderboard!');
         } else {
@@ -314,14 +375,25 @@ async function handleGameOver(won) {
         }
       }
       
-      if (confirm('Start a new game?')) {
-        startNewGame();
+      if (isDailyPuzzle) {
+        if (confirm('Play another difficulty of today\'s puzzle?')) {
+          showDailyPuzzleModal();
+        }
+      } else {
+        if (confirm('Start a new game?')) {
+          startNewGame();
+        }
       }
     }, 500);
   } else {
     setTimeout(() => {
-      if (confirm('Game Over! You hit a mine 💥\n\nStart a new game?')) {
-        startNewGame();
+      const puzzleType = isDailyPuzzle ? 'Daily Puzzle' : 'Game';
+      if (confirm(`${puzzleType} Over! You hit a mine 💥\n\nTry again?`)) {
+        if (isDailyPuzzle) {
+          startDailyPuzzle(currentDifficulty);
+        } else {
+          startNewGame();
+        }
       }
     }, 500);
   }
@@ -333,12 +405,13 @@ function getOfflineScores() {
   return scores ? JSON.parse(scores) : [];
 }
 
-function addOfflineScore(name, time, difficulty) {
+function addOfflineScore(name, time, difficulty, isDailyPuzzle = false) {
   const scores = getOfflineScores();
   scores.push({
     name,
     time,
     difficulty,
+    isDailyPuzzle,
     date: new Date().toISOString(),
     timestamp: Date.now()
   });
@@ -378,7 +451,8 @@ async function syncOfflineScores() {
           name: score.name,
           time: score.time,
           difficulty: score.difficulty,
-          date: score.date
+          date: score.date,
+          isDailyPuzzle: score.isDailyPuzzle || false
         })
       });
       
@@ -405,7 +479,7 @@ async function syncOfflineScores() {
 }
 
 // Submit score to leaderboard
-async function submitScore(name, time, difficulty) {
+async function submitScore(name, time, difficulty, isDailyPuzzle = false) {
   try {
     const response = await fetch(`${API_URL}/leaderboard`, {
       method: 'POST',
@@ -414,6 +488,7 @@ async function submitScore(name, time, difficulty) {
         name, 
         time, 
         difficulty,
+        isDailyPuzzle,
         date: new Date().toISOString()
       })
     });
@@ -425,7 +500,7 @@ async function submitScore(name, time, difficulty) {
     return true;
   } catch (error) {
     console.error('Error submitting score, saving offline:', error);
-    addOfflineScore(name, time, difficulty);
+    addOfflineScore(name, time, difficulty, isDailyPuzzle);
     updateSyncIndicator();
     return false;
   }
@@ -444,6 +519,33 @@ document.querySelectorAll('.diff-btn').forEach(btn => {
 // New game button
 newGameBtn.addEventListener('click', startNewGame);
 
+// Daily puzzle modal functions
+function showDailyPuzzleModal() {
+  dailyPuzzleModal.classList.add('show');
+}
+
+function hideDailyPuzzleModal() {
+  dailyPuzzleModal.classList.remove('show');
+}
+
+dailyPuzzleBtn.addEventListener('click', showDailyPuzzleModal);
+
+closeDailyModal.addEventListener('click', hideDailyPuzzleModal);
+
+window.addEventListener('click', (e) => {
+  if (e.target === dailyPuzzleModal) {
+    hideDailyPuzzleModal();
+  }
+});
+
+// Daily difficulty buttons
+document.querySelectorAll('.daily-diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const difficulty = btn.dataset.difficulty;
+    startDailyPuzzle(difficulty);
+  });
+});
+
 // Leaderboard functions
 let currentLeaderboardTab = 'Easy';
 
@@ -451,14 +553,27 @@ async function loadLeaderboard(difficulty) {
   try {
     const response = await fetch(`${API_URL}/leaderboard`);
     const data = await response.json();
-    displayLeaderboard(data.leaderboard[difficulty]);
+    
+    if (difficulty === 'Daily') {
+      // Show all daily puzzle scores across all difficulties
+      const dailyScores = [];
+      Object.keys(data.leaderboard).forEach(diff => {
+        const scores = data.leaderboard[diff].filter(s => s.is_daily === 1);
+        dailyScores.push(...scores);
+      });
+      // Sort by time
+      dailyScores.sort((a, b) => a.time - b.time);
+      displayLeaderboard(dailyScores.slice(0, 10), true);
+    } else {
+      displayLeaderboard(data.leaderboard[difficulty]);
+    }
   } catch (error) {
     console.error('Error loading leaderboard:', error);
     displayLeaderboard([]);
   }
 }
 
-function displayLeaderboard(scores) {
+function displayLeaderboard(scores, showDifficulty = false) {
   const content = document.getElementById('leaderboardContent');
   
   if (!scores || scores.length === 0) {
@@ -472,6 +587,7 @@ function displayLeaderboard(scores) {
         <tr>
           <th>Rank</th>
           <th>Name</th>
+          ${showDifficulty ? '<th>Difficulty</th>' : ''}
           <th>Time</th>
           <th>Date</th>
         </tr>
@@ -485,6 +601,7 @@ function displayLeaderboard(scores) {
       <tr>
         <td>${index + 1}</td>
         <td>${score.name}</td>
+        ${showDifficulty ? `<td>${score.difficulty}</td>` : ''}
         <td>${formatTimeWithTotal(score.time)}</td>
         <td>${date}</td>
       </tr>

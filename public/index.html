@@ -12,13 +12,17 @@
     
     <div class="controls">
       <div class="difficulty">
-        <button id="easy" class="diff-btn">Easy (8x8, 10)</button>
-        <button id="medium" class="diff-btn active">Medium (10x10, 15)</button>
-        <button id="hard" class="diff-btn">Hard (15x15, 35)</button>
-        <button id="expert" class="diff-btn">Expert (18x18, 60)</button>
-        <button id="extreme" class="diff-btn">Extreme (20x20, 80)</button>
+        <button id="easy" class="diff-btn">Easy (10x10, 10)</button>
+        <button id="medium" class="diff-btn active">Medium (15x15, 25)</button>
+        <button id="hard" class="diff-btn">Hard (20x20, 40)</button>
+        <button id="pro" class="diff-btn">Pro (30x30, 50)</button>
+        <button id="expert" class="diff-btn">Expert (40x40, 100)</button>
+        <button id="extreme" class="diff-btn">Extreme (50x50, 150)</button>
       </div>
-      <button id="newGame" class="new-game-btn">New Game</button>
+      <div class="game-buttons">
+        <button id="dailyPuzzleBtn" class="daily-puzzle-btn">📅 Daily Puzzle</button>
+        <button id="newGame" class="new-game-btn">New Game</button>
+      </div>
     </div>
 
     <div class="game-info">
@@ -48,6 +52,22 @@
 
     <button id="leaderboardBtn" class="leaderboard-btn">🏆 View Leaderboard</button>
 
+    <div id="dailyPuzzleModal" class="modal">
+      <div class="modal-content">
+        <span class="close-daily">&times;</span>
+        <h2>📅 Daily Puzzle</h2>
+        <p>Choose a difficulty for today's puzzle. Everyone gets the same puzzle!</p>
+        <div class="daily-difficulty">
+          <button class="daily-diff-btn" data-difficulty="easy">Easy (10x10, 10)</button>
+          <button class="daily-diff-btn" data-difficulty="medium">Medium (15x15, 25)</button>
+          <button class="daily-diff-btn" data-difficulty="hard">Hard (20x20, 40)</button>
+          <button class="daily-diff-btn" data-difficulty="pro">Pro (30x30, 50)</button>
+          <button class="daily-diff-btn" data-difficulty="expert">Expert (40x40, 100)</button>
+          <button class="daily-diff-btn" data-difficulty="extreme">Extreme (50x50, 150)</button>
+        </div>
+      </div>
+    </div>
+
     <div id="leaderboardModal" class="modal">
       <div class="modal-content">
         <span class="close">&times;</span>
@@ -56,8 +76,10 @@
           <button class="tab-btn active" data-difficulty="Easy">Easy</button>
           <button class="tab-btn" data-difficulty="Medium">Medium</button>
           <button class="tab-btn" data-difficulty="Hard">Hard</button>
+          <button class="tab-btn" data-difficulty="Pro">Pro</button>
           <button class="tab-btn" data-difficulty="Expert">Expert</button>
           <button class="tab-btn" data-difficulty="Extreme">Extreme</button>
+          <button class="tab-btn" data-difficulty="Daily">📅 Daily</button>
         </div>
         <div id="leaderboardContent" class="leaderboard-content"></div>
       </div>

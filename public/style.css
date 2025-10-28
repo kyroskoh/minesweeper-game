@@ -19,7 +19,9 @@ body {
   border-radius: 16px;
   padding: 30px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  max-width: 750px;
+  max-width: 95vw;
+  max-height: 95vh;
+  overflow: auto;
 }
 
 h1 {
@@ -50,9 +52,10 @@ h1 {
   color: #667eea;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 0.75em;
+  font-size: 0.7em;
   transition: all 0.3s ease;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .diff-btn:hover {
@@ -64,7 +67,12 @@ h1 {
   color: white;
 }
 
-.new-game-btn {
+.game-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.new-game-btn, .daily-puzzle-btn {
   padding: 10px 20px;
   background: #764ba2;
   color: white;
@@ -76,8 +84,17 @@ h1 {
   transition: all 0.3s ease;
 }
 
+.daily-puzzle-btn {
+  background: #FF6B6B;
+}
+
 .new-game-btn:hover {
   background: #5f3a82;
+  transform: scale(1.05);
+}
+
+.daily-puzzle-btn:hover {
+  background: #EE5A5A;
   transform: scale(1.05);
 }
 
@@ -135,6 +152,8 @@ h1 {
   border-radius: 8px;
   margin: 0 auto;
   display: grid;
+  max-width: 100%;
+  overflow: auto;
 }
 
 .cell {
@@ -151,6 +170,35 @@ h1 {
   font-size: 0.9em;
   transition: all 0.1s ease;
   user-select: none;
+}
+
+/* Dynamic cell sizing for larger boards */
+.board[data-cell-size="25"] .cell {
+  width: 25px;
+  height: 25px;
+  font-size: 0.8em;
+  border-width: 1px;
+}
+
+.board[data-cell-size="20"] .cell {
+  width: 20px;
+  height: 20px;
+  font-size: 0.7em;
+  border-width: 1px;
+}
+
+.board[data-cell-size="18"] .cell {
+  width: 18px;
+  height: 18px;
+  font-size: 0.65em;
+  border-width: 1px;
+}
+
+.board[data-cell-size="15"] .cell {
+  width: 15px;
+  height: 15px;
+  font-size: 0.6em;
+  border-width: 1px;
 }
 
 .cell:hover:not(.revealed):not(.flagged) {
@@ -278,14 +326,38 @@ h1 {
   top: 0;
   width: 100%;
   height: 100%;
-  overflow: auto;
   background-color: rgba(0, 0, 0, 0.5);
   animation: fadeIn 0.3s ease;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.modal.show {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.daily-difficulty {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.daily-diff-btn {
+  padding: 12px 20px;
+  background: #FF6B6B;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1em;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.daily-diff-btn:hover {
+  background: #EE5A5A;
+  transform: translateX(5px);
 }
 
 .modal.show {

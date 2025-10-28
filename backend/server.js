@@ -41,9 +41,18 @@ initSqlJs().then(SQL => {
       name TEXT NOT NULL,
       time INTEGER NOT NULL,
       difficulty TEXT NOT NULL,
-      date TEXT NOT NULL
+      date TEXT NOT NULL,
+      is_daily INTEGER DEFAULT 0
     )
   `);
+  
+  // Add is_daily column if it doesn't exist (for existing databases)
+  try {
+    db.run('ALTER TABLE leaderboard ADD COLUMN is_daily INTEGER DEFAULT 0');
+    console.log('Added is_daily column to existing database');
+  } catch (err) {
+    // Column already exists, ignore
+  }
   
   // Create index for faster queries (only runs for new DB)
   db.run(`
@@ -89,16 +98,17 @@ async function reloadDatabase() {
 
 // Difficulty names
 const difficultyNames = {
-  '8-8-10': 'Easy',
-  '10-10-15': 'Medium',
-  '15-15-35': 'Hard',
-  '18-18-60': 'Expert',
-  '20-20-80': 'Extreme'
+  '10-10-10': 'Easy',
+  '15-15-25': 'Medium',
+  '20-20-40': 'Hard',
+  '30-30-50': 'Pro',
+  '40-40-100': 'Expert',
+  '50-50-150': 'Extreme'
 };
 
 // Game class
 class MinesweeperGame {
-  constructor(rows = 10, cols = 10, mines = 15) {
+  constructor(rows = 10, cols = 10, mines = 15, seed = null, isDailyPuzzle = false) {
     this.rows = rows;
     this.cols = cols;
     this.minesCount = mines;
@@ -112,10 +122,13 @@ class MinesweeperGame {
     this.firstMove = true;
     this.hitMineRow = null;
     this.hitMineCol = null;
-    this.initializeBoard();
+    this.seed = seed;
+    this.rng = null;
+    this.isDailyPuzzle = isDailyPuzzle;
+    this.initializeBoard(seed);
   }
 
-  initializeBoard() {
+  initializeBoard(seed = null) {
     // Initialize empty board
     for (let i = 0; i < this.rows; i++) {
       this.board[i] = [];
@@ -128,14 +141,14 @@ class MinesweeperGame {
       }
     }
 
-    // Determine if this is a high difficulty (hard, expert, extreme)
-    const isHighDifficulty = (this.rows >= 15 && this.cols >= 15 && this.minesCount >= 35);
-    
-    if (isHighDifficulty) {
-      this.placeMinesSolvable();
-    } else {
-      this.placeMinesRandom();
+    // Use seed for deterministic placement if provided
+    if (seed !== null) {
+      this.seed = seed;
+      this.rng = this.seededRandom(seed);
     }
+    
+    // All difficulties now use skill-based placement
+    this.placeMinesSolvable();
 
     // Calculate numbers for non-mine cells
     for (let i = 0; i < this.rows; i++) {
@@ -147,19 +160,19 @@ class MinesweeperGame {
     }
   }
 
-  placeMinesRandom() {
-    // Place mines randomly (for easy and medium)
-    let minesPlaced = 0;
-    while (minesPlaced < this.minesCount) {
-      const row = Math.floor(Math.random() * this.rows);
-      const col = Math.floor(Math.random() * this.cols);
-      
-      if (this.board[row][col] !== -1) {
-        this.board[row][col] = -1;
-        minesPlaced++;
-      }
-    }
+  seededRandom(seed) {
+    // Simple seeded random number generator
+    let state = seed;
+    return function() {
+      state = (state * 1664525 + 1013904223) % 4294967296;
+      return state / 4294967296;
+    };
   }
+
+  random() {
+    return this.rng ? this.rng() : Math.random();
+  }
+
 
   placeMinesSolvable() {
     // Place mines in clusters to create higher numbers (4, 5, 6) for logical solving
@@ -169,8 +182,8 @@ class MinesweeperGame {
     
     for (let cluster = 0; cluster < numClusters && minesPlaced < this.minesCount; cluster++) {
       // Pick a random center point for the cluster
-      const centerRow = Math.floor(Math.random() * this.rows);
-      const centerCol = Math.floor(Math.random() * this.cols);
+      const centerRow = Math.floor(this.random() * this.rows);
+      const centerCol = Math.floor(this.random() * this.cols);
       
       // Place mines in a cluster pattern around the center
       const offsets = [
@@ -179,7 +192,7 @@ class MinesweeperGame {
       
       // Shuffle offsets for variety
       for (let i = offsets.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = Math.floor(this.random() * (i + 1));
         [offsets[i], offsets[j]] = [offsets[j], offsets[i]];
       }
       
@@ -204,8 +217,8 @@ class MinesweeperGame {
     
     while (minesPlaced < this.minesCount && attempts < maxAttempts) {
       attempts++;
-      const row = Math.floor(Math.random() * this.rows);
-      const col = Math.floor(Math.random() * this.cols);
+      const row = Math.floor(this.random() * this.rows);
+      const col = Math.floor(this.random() * this.cols);
       
       if (this.board[row][col] !== -1) {
         // Check if placing here would create interesting numbers nearby
@@ -215,7 +228,7 @@ class MinesweeperGame {
         if (adjacentMines >= 1 && adjacentMines <= 4) {
           this.board[row][col] = -1;
           minesPlaced++;
-        } else if (Math.random() < 0.3) {
+        } else if (this.random() < 0.3) {
           // 30% chance to place anyway for variety
           this.board[row][col] = -1;
           minesPlaced++;
@@ -225,8 +238,8 @@ class MinesweeperGame {
     
     // If still not enough mines, place remaining randomly
     while (minesPlaced < this.minesCount) {
-      const row = Math.floor(Math.random() * this.rows);
-      const col = Math.floor(Math.random() * this.cols);
+      const row = Math.floor(this.random() * this.rows);
+      const col = Math.floor(this.random() * this.cols);
       
       if (this.board[row][col] !== -1) {
         this.board[row][col] = -1;
@@ -379,6 +392,16 @@ class MinesweeperGame {
   }
 }
 
+// Get daily puzzle seed based on current date
+function getDailySeed() {
+  const today = new Date();
+  const year = today.getUTCFullYear();
+  const month = today.getUTCMonth() + 1;
+  const day = today.getUTCDate();
+  // Create a unique seed for today
+  return year * 10000 + month * 100 + day;
+}
+
 // API Endpoints
 app.post('/api/game/new', (req, res) => {
   const { rows = 10, cols = 10, mines = 15 } = req.body;
@@ -389,6 +412,45 @@ app.post('/api/game/new', (req, res) => {
   res.json({
     gameId,
     state: game.getGameState()
+  });
+});
+
+app.post('/api/game/daily', (req, res) => {
+  const { difficulty = 'medium' } = req.body;
+  const seed = getDailySeed();
+  
+  // Daily puzzle configurations
+  const dailyConfigs = {
+    easy: { rows: 10, cols: 10, mines: 10 },
+    medium: { rows: 15, cols: 15, mines: 25 },
+    hard: { rows: 20, cols: 20, mines: 40 },
+    pro: { rows: 30, cols: 30, mines: 50 },
+    expert: { rows: 40, cols: 40, mines: 100 },
+    extreme: { rows: 50, cols: 50, mines: 150 }
+  };
+  
+  const config = dailyConfigs[difficulty] || dailyConfigs.medium;
+  const gameId = `daily-${difficulty}-${seed}`;
+  
+  // Check if this daily puzzle already exists
+  if (games.has(gameId)) {
+    const game = games.get(gameId);
+    return res.json({
+      gameId,
+      state: game.getGameState(),
+      seed,
+      isDailyPuzzle: true
+    });
+  }
+  
+  const game = new MinesweeperGame(config.rows, config.cols, config.mines, seed, true);
+  games.set(gameId, game);
+  
+  res.json({
+    gameId,
+    state: game.getGameState(),
+    seed,
+    isDailyPuzzle: true
   });
 });
 
@@ -454,7 +516,7 @@ app.get('/api/game/:gameId/dev', (req, res) => {
 });
 
 app.post('/api/leaderboard', (req, res) => {
-  const { name, time, difficulty, date } = req.body;
+  const { name, time, difficulty, date, isDailyPuzzle = false } = req.body;
   
   if (!name || !time || !difficulty) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -464,13 +526,14 @@ app.post('/api/leaderboard', (req, res) => {
     name: name.substring(0, 20), // Limit name length
     time,
     difficulty,
-    date: date || new Date().toISOString() // Use provided date or current time
+    date: date || new Date().toISOString(), // Use provided date or current time
+    isDailyPuzzle: isDailyPuzzle ? 1 : 0
   };
 
   try {
     db.run(
-      'INSERT INTO leaderboard (name, time, difficulty, date) VALUES (?, ?, ?, ?)',
-      [entry.name, entry.time, entry.difficulty, entry.date]
+      'INSERT INTO leaderboard (name, time, difficulty, date, is_daily) VALUES (?, ?, ?, ?, ?)',
+      [entry.name, entry.time, entry.difficulty, entry.date, entry.isDailyPuzzle]
     );
     saveDatabase();
     
