@@ -42,6 +42,11 @@ const difficulties = {
 
 let currentDifficulty = 'medium';
 
+// Detect mobile/tablet for optimizations
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                 window.innerWidth <= 1024;
+const isWeakDevice = isMobile && (navigator.hardwareConcurrency <= 4 || /ARM/i.test(navigator.platform));
+
 // Initialize game
 async function startNewGame() {
   isDailyPuzzle = false;
@@ -186,74 +191,96 @@ function renderBoard() {
     cellSize = 25;
   }
   
+  // Reduce cell size on mobile for better performance
+  if (isMobile && cellSize > 20) {
+    cellSize = Math.max(20, cellSize - 5);
+  }
+  
   boardElement.style.gridTemplateColumns = `repeat(${gameState.cols}, ${cellSize}px)`;
   boardElement.style.gridTemplateRows = `repeat(${gameState.rows}, ${cellSize}px)`;
   boardElement.dataset.cellSize = cellSize;
   
+  // Use DocumentFragment for batch DOM insertion (faster on mobile)
+  const fragment = document.createDocumentFragment();
+  
   for (let i = 0; i < gameState.rows; i++) {
     for (let j = 0; j < gameState.cols; j++) {
       const cell = createCell(i, j);
-      boardElement.appendChild(cell);
+      fragment.appendChild(cell);
     }
   }
+  
+  boardElement.appendChild(fragment);
 }
 
 // Update cells efficiently (only changed cells)
 function updateCells() {
   if (!gameState) return;
   
-  // Use requestAnimationFrame for smoother rendering
-  requestAnimationFrame(() => {
-    const cells = boardElement.querySelectorAll('.cell');
+  // Immediate DOM updates for faster response (no requestAnimationFrame delay)
+  const cells = boardElement.children;
+  
+  // On weak devices, batch updates to reduce reflows
+  if (isWeakDevice) {
+    boardElement.style.display = 'none'; // Hide during batch update
+  }
     
-    for (let i = 0; i < gameState.rows; i++) {
-      for (let j = 0; j < gameState.cols; j++) {
-        // Skip unchanged cells
-        if (previousGameState && 
-            gameState.revealed[i][j] === previousGameState.revealed[i][j] &&
-            gameState.flags[i][j] === previousGameState.flags[i][j]) {
-          continue;
-        }
+  for (let i = 0; i < gameState.rows; i++) {
+    for (let j = 0; j < gameState.cols; j++) {
+      // Skip unchanged cells
+      if (previousGameState && 
+          gameState.revealed[i][j] === previousGameState.revealed[i][j] &&
+          gameState.flags[i][j] === previousGameState.flags[i][j]) {
+        continue;
+      }
+      
+      const index = i * gameState.cols + j;
+      const cell = cells[index];
+      if (!cell) continue;
+      
+      const isRevealed = gameState.revealed[i][j];
+      const isFlagged = gameState.flags[i][j];
+      const value = gameState.values[i][j];
+      const isHitMine = gameState.hitMineRow === i && gameState.hitMineCol === j;
+      
+      // Reset inline styles from optimistic updates
+      cell.style.opacity = '';
+      cell.style.transform = '';
+      
+      // Clear previous state
+      cell.className = 'cell';
+      cell.textContent = '';
+      
+      if (isFlagged) {
+        cell.classList.add('flagged');
+        cell.textContent = '🚩';
+      } else if (isRevealed) {
+        cell.classList.add('revealed');
         
-        const index = i * gameState.cols + j;
-        const cell = cells[index];
-        if (!cell) continue;
-        
-        const isRevealed = gameState.revealed[i][j];
-        const isFlagged = gameState.flags[i][j];
-        const value = gameState.values[i][j];
-        const isHitMine = gameState.hitMineRow === i && gameState.hitMineCol === j;
-        
-        // Clear previous state
-        cell.className = 'cell';
-        cell.textContent = '';
-        
-        if (isFlagged) {
-          cell.classList.add('flagged');
-          cell.textContent = '🚩';
-        } else if (isRevealed) {
-          cell.classList.add('revealed');
-          
-          if (value === -1) {
-            cell.classList.add('mine');
-            if (isHitMine) {
-              cell.classList.add('hit-mine');
-            }
-            cell.textContent = '💣';
-          } else if (value > 0) {
-            cell.textContent = value;
-            cell.classList.add(`cell-${value}`);
+        if (value === -1) {
+          cell.classList.add('mine');
+          if (isHitMine) {
+            cell.classList.add('hit-mine');
           }
+          cell.textContent = '💣';
+        } else if (value > 0) {
+          cell.textContent = value;
+          cell.classList.add(`cell-${value}`);
         }
       }
     }
+  }
+  
+  // Restore display on weak devices
+  if (isWeakDevice) {
+    boardElement.style.display = '';
+  }
     
-    // Store current state for next comparison
-    previousGameState = {
-      revealed: gameState.revealed.map(row => [...row]),
-      flags: gameState.flags.map(row => [...row])
-    };
-  });
+  // Store current state for next comparison
+  previousGameState = {
+    revealed: gameState.revealed.map(row => [...row]),
+    flags: gameState.flags.map(row => [...row])
+  };
 }
 
 // Create a single cell
@@ -340,6 +367,16 @@ function createCell(row, col) {
 async function handleCellClick(row, col) {
   if (!gameId || gameState.gameOver || gameState.flags[row][col] || isUpdating) return;
   
+  // Immediate visual feedback - optimistic UI (skip transform on weak devices)
+  const cellIndex = row * gameState.cols + col;
+  const cell = boardElement.children[cellIndex];
+  if (cell && !cell.classList.contains('revealed')) {
+    cell.style.opacity = '0.6';
+    if (!isWeakDevice) {
+      cell.style.transform = 'scale(0.95)';
+    }
+  }
+  
   isUpdating = true;
   
   try {
@@ -369,6 +406,11 @@ async function handleCellClick(row, col) {
     }
   } catch (error) {
     console.error('Error revealing cell:', error);
+    // Reset visual feedback on error
+    if (cell) {
+      cell.style.opacity = '';
+      cell.style.transform = '';
+    }
   } finally {
     isUpdating = false;
   }
@@ -377,6 +419,21 @@ async function handleCellClick(row, col) {
 // Handle right click (toggle flag)
 async function handleRightClick(row, col) {
   if (!gameId || gameState.gameOver || gameState.revealed[row][col] || isUpdating) return;
+  
+  // Immediate visual feedback - optimistic UI
+  const cellIndex = row * gameState.cols + col;
+  const cell = boardElement.children[cellIndex];
+  const wasFlagged = gameState.flags[row][col];
+  
+  if (cell) {
+    if (wasFlagged) {
+      cell.textContent = '';
+      cell.classList.remove('flagged');
+    } else {
+      cell.textContent = '🚩';
+      cell.classList.add('flagged');
+    }
+  }
   
   isUpdating = true;
   
@@ -403,6 +460,16 @@ async function handleRightClick(row, col) {
     updateGameInfo();
   } catch (error) {
     console.error('Error toggling flag:', error);
+    // Revert optimistic update on error
+    if (cell) {
+      if (wasFlagged) {
+        cell.textContent = '🚩';
+        cell.classList.add('flagged');
+      } else {
+        cell.textContent = '';
+        cell.classList.remove('flagged');
+      }
+    }
   } finally {
     isUpdating = false;
   }
