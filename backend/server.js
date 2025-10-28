@@ -569,7 +569,7 @@ app.get('/api/leaderboard/:difficulty', async (req, res) => {
     await reloadDatabase();
     
     const stmt = db.prepare(
-      'SELECT name, time, difficulty, date FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
+      'SELECT name, time, difficulty, date, is_daily FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
     );
     stmt.bind([difficulty]);
     
@@ -596,7 +596,7 @@ app.get('/api/leaderboard', async (req, res) => {
     Object.keys(difficultyNames).forEach(key => {
       const diffName = difficultyNames[key];
       const stmt = db.prepare(
-        'SELECT name, time, difficulty, date FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
+        'SELECT name, time, difficulty, date, is_daily FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
       );
       stmt.bind([diffName]);
       

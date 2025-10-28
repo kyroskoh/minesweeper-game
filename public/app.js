@@ -828,11 +828,6 @@ function displayDailyLeaderboard(selectedDifficulty) {
   // Check if there are any scores at all
   const hasScores = Object.keys(dailyLeaderboardData).length > 0;
   
-  if (!hasScores) {
-    content.innerHTML = '<div class="no-scores">No daily puzzle scores yet. Be the first!</div>';
-    return;
-  }
-  
   // Difficulty icons mapping
   const difficultyIcons = {
     Easy: '🌱',
@@ -846,7 +841,7 @@ function displayDailyLeaderboard(selectedDifficulty) {
   // Order of difficulties
   const difficultyOrder = ['Easy', 'Medium', 'Hard', 'Pro', 'Expert', 'Extreme'];
   
-  // Build difficulty selector
+  // Build difficulty selector (always show, even with no scores)
   let html = '<div class="daily-difficulty-selector">';
   
   html += `<button class="daily-diff-filter ${selectedDifficulty === 'all' ? 'active' : ''}" data-diff="all">
@@ -854,18 +849,35 @@ function displayDailyLeaderboard(selectedDifficulty) {
   </button>`;
   
   difficultyOrder.forEach(difficulty => {
-    if (dailyLeaderboardData[difficulty] && dailyLeaderboardData[difficulty].length > 0) {
-      const icon = difficultyIcons[difficulty] || '📅';
-      const count = dailyLeaderboardData[difficulty].length;
-      html += `
-        <button class="daily-diff-filter ${selectedDifficulty === difficulty ? 'active' : ''}" data-diff="${difficulty}">
-          ${icon} ${difficulty} <span class="filter-count">(${count})</span>
-        </button>
-      `;
-    }
+    const icon = difficultyIcons[difficulty] || '📅';
+    const scores = dailyLeaderboardData[difficulty];
+    const count = scores ? scores.length : 0;
+    const countDisplay = count > 0 ? ` <span class="filter-count">(${count})</span>` : '';
+    
+    html += `
+      <button class="daily-diff-filter ${selectedDifficulty === difficulty ? 'active' : ''}" data-diff="${difficulty}">
+        ${icon} ${difficulty}${countDisplay}
+      </button>
+    `;
   });
   
   html += '</div>';
+  
+  // If no scores at all, show empty state after selector
+  if (!hasScores) {
+    html += '<div class="no-scores">No daily puzzle scores yet. Be the first to complete today\'s challenge!</div>';
+    content.innerHTML = html;
+    
+    // Add event listeners to filter buttons
+    document.querySelectorAll('.daily-diff-filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const difficulty = btn.dataset.diff;
+        currentDailyDifficulty = difficulty;
+        displayDailyLeaderboard(difficulty);
+      });
+    });
+    return;
+  }
   
   // Display leaderboard based on selection
   if (selectedDifficulty === 'all') {
