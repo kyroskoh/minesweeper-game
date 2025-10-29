@@ -1,4 +1,16 @@
-# Add Score Script Documentation
+# Minesweeper Helper Scripts
+
+This directory contains utility scripts for managing the Minesweeper game's leaderboard database.
+
+## Available Scripts
+
+1. **add-score.js** - Manually add scores to the leaderboard
+2. **migrate-scores.js** - Move/migrate scores between regular and daily puzzle categories
+3. **sync-historical.js** - Sync existing daily scores to historical daily databases
+
+---
+
+# 1. Add Score Script
 
 ## Overview
 The `add-score.js` script allows you to manually add scores to the Minesweeper leaderboard database. This is useful for testing, importing scores, or manually adding achievements.
@@ -247,67 +259,63 @@ CREATE TABLE leaderboard (
 - `date` - ISO 8601 date string
 - `is_daily` - 0 for regular games, 1 for daily puzzles
 
-## Score Migration Tool
+---
 
-### Overview
+# 2. Score Migration Tool
+
+## Overview
 The `migrate-scores.js` script helps fix scores that were incorrectly categorized as daily or regular due to bugs. It allows you to move scores between these categories.
 
-### Usage
+**Important**: When migrating TO daily, scores are automatically archived to historical databases!
+
+## Usage
 
 ```bash
+npm run migrate-scores
+# or
 node scripts/migrate-scores.js
 ```
 
-### Features
+## Features
 
-#### 1. View All Scores
+### 1. View All Scores
 Shows all scores grouped by type (Regular/Daily):
 ```
 📊 Current Scores:
 
 🎮 REGULAR GAME SCORES:
 ──────────────────────────────────────────────────────────────────────
-  [ID:1] Player1 - 01m30s (Easy) - 10/28/2025
-  [ID:3] Player2 - 02m15s (Medium) - 10/28/2025
+  [ID:1] Player1 [device_123...] - 01m30s (Easy) - 10/28/2025
+  [ID:3] Player2 [device_456...] - 02m15s (Medium) - 10/28/2025
 
 📅 DAILY PUZZLE SCORES:
 ──────────────────────────────────────────────────────────────────────
-  [ID:2] Player3 - 03m00s (Hard) - 10/28/2025
+  [ID:2] Player3 [device_789...] - 03m00s (Hard) - 10/28/2025
 ```
 
-#### 2. Move Regular to Daily
-Migrates regular game scores to daily puzzle category:
-```bash
-# Select from menu option 2
-# Choose specific scores or "all"
-```
+### 2. Move Regular to Daily
+Migrates regular game scores to daily puzzle category and archives to historical databases.
 
-#### 3. Move Daily to Regular
-Migrates daily puzzle scores to regular game category:
-```bash
-# Select from menu option 3
-```
+### 3. Move Daily to Regular
+Migrates daily puzzle scores to regular game category.
+**Note**: Historical databases are preserved (not deleted).
 
-#### 4. Move by Score ID
-Migrate a specific score by its database ID:
-```bash
-# Select menu option 4
-# Enter the score ID
-```
+### 4. Move by Score ID
+Migrate a specific score by its database ID.
 
-#### 5. Move by Name and Date
-Find and migrate scores by player name and/or date:
-```bash
-# Select menu option 5
-# Enter player name (partial matches work)
-# Optionally filter by date (YYYY-MM-DD)
-```
+### 5. Move by Name and Date
+Find and migrate scores by player name and/or date.
 
-### Examples
+## Detailed Examples
 
-#### Migrate All Regular Scores to Daily
+### Example 1: View All Scores First
+**Always start by viewing what you have:**
+
 ```bash
-$ node scripts/migrate-scores.js
+$ npm run migrate-scores
+
+🔄 Minesweeper Score Migration Tool
+
 Select an operation:
   1) View all scores (grouped by type)
   2) Move scores from Regular to Daily
@@ -316,45 +324,214 @@ Select an operation:
   5) Move scores by name and date
   6) Exit
 
+Enter your choice (1-6): 1
+
+📊 Current Scores:
+
+🎮 REGULAR GAME SCORES (15 total):
+──────────────────────────────────────────────────────────────────────
+  [ID:1] Alice [device_123...] - 45s (Easy) - 10/28/2025
+  [ID:3] Bob [device_456...] - 01m30s (Medium) - 10/28/2025
+  [ID:5] Charlie [legacy] - 02m00s (Hard) - 10/27/2025
+  ...
+
+📅 DAILY PUZZLE SCORES (8 total):
+──────────────────────────────────────────────────────────────────────
+  [ID:2] Dana [device_789...] - 01m15s (Easy) - 10/28/2025
+  [ID:4] Eve [device_012...] - 03m30s (Expert) - 10/28/2025
+  ...
+```
+
+### Example 2: Migrate All Regular Scores to Daily
+**Scenario**: You accidentally ran regular games on a daily puzzle seed.
+
+```bash
 Enter your choice (1-6): 2
 
-Found 5 Regular score(s):
+🔄 Move scores from Regular to Daily
 
-  1) [ID:10] John Doe - 01m30s (Easy) - 10/28/2025
-  2) [ID:11] Jane Smith - 02m00s (Medium) - 10/28/2025
+Found 15 Regular score(s):
+
+  1) [ID:1] Alice [device_123...] - 45s (Easy) - 10/28/2025
+  2) [ID:3] Bob [device_456...] - 01m30s (Medium) - 10/28/2025
+  3) [ID:5] Charlie [legacy] - 02m00s (Hard) - 10/27/2025
   ...
+
+Options:
+  - Enter score numbers to migrate (e.g., "1,3,5" or "1-5")
+  - Enter "all" to migrate all scores
+  - Enter "cancel" to go back
 
 Enter your selection: all
 
+⚠️  About to migrate 15 score(s) from Regular to Daily:
+  • Alice - 45s (Easy) - 10/28/2025
+  • Bob - 01m30s (Medium) - 10/28/2025
+  • Charlie - 02m00s (Hard) - 10/27/2025
+  ...
+
 Proceed with migration? (yes/no): yes
 
-✅ Successfully migrated 5 score(s)!
+✅ Successfully migrated 15 score(s)!
+✅ Archived 15 score(s) to historical database!
+
+Press Enter to continue...
 ```
 
-#### Migrate Specific Scores
+**Result**: All 15 scores are now daily puzzles AND archived to their respective date's historical database!
+
+### Example 3: Migrate Specific Scores by Selection
+**Scenario**: Only some scores from yesterday need to be fixed.
+
 ```bash
-Enter your selection: 1,3,5
+Enter your choice (1-6): 2
+
+Found 10 Regular score(s):
+
+  1) [ID:10] John - 01m30s (Easy) - 10/28/2025
+  2) [ID:11] Jane - 02m00s (Easy) - 10/28/2025
+  3) [ID:12] Bob - 03m00s (Medium) - 10/27/2025  ← Fix this
+  4) [ID:13] Alice - 04m00s (Medium) - 10/27/2025  ← Fix this
+  5) [ID:14] Tom - 05m00s (Hard) - 10/27/2025  ← Fix this
+  6) [ID:15] Sara - 06m00s (Hard) - 10/26/2025
+  ...
+
+Enter your selection: 3-5
 
 ⚠️  About to migrate 3 score(s) from Regular to Daily:
-  • John Doe - 01m30s (Easy) - 10/28/2025
-  • Bob Wilson - 03m00s (Hard) - 10/28/2025
-  • Alice Brown - 05m30s (Expert) - 10/28/2025
+  • Bob - 03m00s (Medium) - 10/27/2025
+  • Alice - 04m00s (Medium) - 10/27/2025
+  • Tom - 05m00s (Hard) - 10/27/2025
 
 Proceed with migration? (yes/no): yes
+
+✅ Successfully migrated 3 score(s)!
+✅ Archived 3 score(s) to historical database!
 ```
 
-#### Migrate by Name
+**Result**: Only Bob, Alice, and Tom's scores from 10/27 are migrated to daily and archived.
+
+### Example 4: Migrate by Name and Date
+**Scenario**: Fix all of John's scores from a specific date.
+
 ```bash
+Enter your choice (1-6): 5
+
+🔍 Migrate Scores by Name and Date
+
 Enter player name (or partial name): John
+Enter date (YYYY-MM-DD) or leave empty for all dates: 2025-10-27
+
+Found 4 matching score(s):
+
+  1) [ID:10] John Doe [device_abc...] - 01m30s (Easy) - 10/27/2025 - 🎮 Regular
+  2) [ID:12] Johnny [device_def...] - 02m00s (Medium) - 10/27/2025 - 📅 Daily
+  3) [ID:15] John Smith [device_ghi...] - 03m00s (Hard) - 10/27/2025 - 🎮 Regular
+  4) [ID:18] John Jr [legacy] - 04m00s (Pro) - 10/27/2025 - 🎮 Regular
+
+Options:
+  - Enter score numbers to migrate (e.g., "1,3,5" or "1-5")
+  - Enter "all" to migrate all scores
+  - Enter "cancel" to go back
+
+Enter your selection: 1,3,4
+
+⚠️  About to migrate 3 score(s):
+  • John Doe (Regular → Daily): 01m30s (Easy) - 10/27/2025
+  • John Smith (Regular → Daily): 03m00s (Hard) - 10/27/2025
+  • John Jr (Regular → Daily): 04m00s (Pro) - 10/27/2025
+
+Proceed with migration? (yes/no): yes
+
+✅ Successfully migrated 3 score(s)!
+✅ Archived 3 score(s) to historical database!
+```
+
+**Result**: John Doe, John Smith, and John Jr's scores from 10/27 are now daily puzzles. Johnny's score is unchanged (already daily).
+
+### Example 5: Migrate Single Score by ID
+**Scenario**: You know the exact ID of the misclassified score.
+
+```bash
+Enter your choice (1-6): 4
+
+🔍 Migrate Score by ID
+
+Enter score ID: 42
+
+Score Details:
+  Name: SpeedRunner
+  Time: 02m45s
+  Difficulty: Expert
+  Date: 10/28/2025
+  Device ID: device_xyz123...
+  Current Type: Regular
+  Will become: Daily
+
+Proceed with migration? (yes/no): yes
+
+✅ Score migrated from Regular to Daily!
+✅ Score archived to historical database!
+```
+
+### Example 6: Fix Incorrectly Marked Daily Scores
+**Scenario**: Some regular games were accidentally marked as daily.
+
+```bash
+Enter your choice (1-6): 3
+
+🔄 Move scores from Daily to Regular
+
+Found 5 Daily score(s):
+
+  1) [ID:20] TestPlayer [device_test...] - 30s (Easy) - 10/28/2025  ← This was a test
+  2) [ID:21] TestPlayer [device_test...] - 35s (Easy) - 10/28/2025  ← This was a test
+  3) [ID:22] RealPlayer [device_real...] - 01m45s (Medium) - 10/28/2025  ← Keep as daily
+  4) [ID:23] ProPlayer [device_pro...] - 05m30s (Expert) - 10/28/2025  ← Keep as daily
+  5) [ID:24] NewPlayer [device_new...] - 10m00s (Extreme) - 10/28/2025  ← Keep as daily
+
+Enter your selection: 1,2
+
+⚠️  About to migrate 2 score(s) from Daily to Regular:
+  • TestPlayer - 30s (Easy) - 10/28/2025
+  • TestPlayer - 35s (Easy) - 10/28/2025
+
+Proceed with migration? (yes/no): yes
+
+✅ Successfully migrated 2 score(s)!
+```
+
+**Result**: Test scores are now regular games. Historical databases preserve the original daily scores.
+
+### Example 7: Migrate by Partial Name Match
+**Scenario**: Find all variations of a player's name.
+
+```bash
+Enter your choice (1-6): 5
+
+Enter player name (or partial name): alex
 Enter date (YYYY-MM-DD) or leave empty for all dates: 
 
-Found 3 matching score(s):
+Found 6 matching score(s):
 
-  1) [ID:10] John Doe - 01m30s (Easy) - 10/28/2025 - 🎮 Regular
-  2) [ID:15] Johnny - 02m00s (Medium) - 10/27/2025 - 📅 Daily
-  3) [ID:20] John Smith - 03m00s (Hard) - 10/26/2025 - 🎮 Regular
+  1) [ID:30] Alex - 01m00s (Easy) - 10/28/2025 - 🎮 Regular
+  2) [ID:31] Alexander - 01m30s (Medium) - 10/28/2025 - 🎮 Regular
+  3) [ID:32] Alexandra - 02m00s (Hard) - 10/27/2025 - 📅 Daily
+  4) [ID:33] Alex_Pro - 03m00s (Pro) - 10/27/2025 - 🎮 Regular
+  5) [ID:34] Alexis - 04m00s (Expert) - 10/26/2025 - 🎮 Regular
+  6) [ID:35] Alex2025 - 05m00s (Extreme) - 10/26/2025 - 🎮 Regular
 
-Selection: 1,3
+Enter your selection: 1,2,4
+
+⚠️  About to migrate 3 score(s):
+  • Alex (Regular → Daily): 01m00s (Easy) - 10/28/2025
+  • Alexander (Regular → Daily): 01m30s (Medium) - 10/28/2025
+  • Alex_Pro (Regular → Daily): 03m00s (Pro) - 10/27/2025
+
+Proceed with migration? (yes/no): yes
+
+✅ Successfully migrated 3 score(s)!
+✅ Archived 3 score(s) to historical database!
 ```
 
 ### Selection Syntax
@@ -372,28 +549,68 @@ Selection: 1,3
 - ✅ Shows old and new type
 - ✅ Creates backup automatically
 
-### Common Use Cases
+## Common Use Cases
 
-#### Fix Yesterday's Daily Puzzle Scores
-If scores were accidentally marked as regular:
+### Use Case 1: Daily Puzzle Bug Fix
+**Problem**: Yesterday's daily puzzle scores were saved as regular games.
+
+**Solution**:
 ```bash
-# Option 5: Move by name and date
+npm run migrate-scores
+# Option 5: Migrate by name and date
 # Enter date: 2025-10-27
-# Select all matching scores
+# Review scores for that date
+# Select all that should be daily
+# Confirm migration
 ```
 
-#### Fix Regular Scores Marked as Daily
-If someone's regular games were marked as daily:
+### Use Case 2: Test Data Cleanup
+**Problem**: Test scores were marked as daily puzzles.
+
+**Solution**:
 ```bash
+npm run migrate-scores
 # Option 3: Move Daily to Regular
-# Enter their score numbers
+# Find test player scores
+# Select them (e.g., "1-10")
+# Confirm migration
 ```
 
-#### Bulk Migration
-Move all scores of a certain type:
+### Use Case 3: Wrong Player Names
+**Problem**: Player submitted scores under different name variations.
+
+**Solution**:
 ```bash
-# Option 2 or 3
-# Enter: all
+npm run migrate-scores
+# Option 5: Migrate by name
+# Enter partial name: "john"
+# Review all matches
+# Migrate as needed
+```
+
+### Use Case 4: Date-Specific Migration
+**Problem**: All scores from October 25 need to be daily.
+
+**Solution**:
+```bash
+npm run migrate-scores
+# Option 5: Migrate by name and date
+# Leave name empty (or enter wildcard)
+# Enter date: 2025-10-25
+# Select all: "all"
+# Confirm migration
+```
+
+### Use Case 5: Single Score Fix
+**Problem**: One specific score (ID 42) needs to be fixed.
+
+**Solution**:
+```bash
+npm run migrate-scores
+# Option 4: Migrate by ID
+# Enter ID: 42
+# Review details
+# Confirm migration
 ```
 
 ## Troubleshooting
@@ -469,10 +686,110 @@ node scripts/add-score.js "Format3" 0:45 Hard         # mm:ss
 node scripts/add-score.js "Format4" 1:30:45 Expert    # h:mm:ss
 ```
 
-## Notes
+---
+
+# 3. Sync Historical Daily Leaderboard
+
+## Overview
+The `sync-historical.js` script synchronizes existing daily puzzle scores from the main `leaderboard.db` into their respective historical daily databases.
+
+**When to use**: After implementing the historical daily feature, or to recover from data loss.
+
+## Quick Start
+
+```bash
+npm run sync-historical
+# or
+node scripts/sync-historical.js
+```
+
+## Features
+
+- 📋 **Preview Mode**: See what will be synced without making changes
+- 🔄 **Sync All**: Process all daily scores at once
+- 🎯 **Selective Sync**: Choose specific dates to sync
+- ✅ **Duplicate Detection**: Automatically skips existing scores
+- 📊 **Detailed Reporting**: Shows progress and summary
+
+## Detailed Examples
+
+See [SYNC_HISTORICAL.md](SYNC_HISTORICAL.md) for comprehensive documentation with 7 detailed examples covering:
+- Initial setup with preview
+- Syncing all scores
+- Selective date syncing
+- Re-running with existing data
+- Recovery scenarios
+- Integration with other scripts
+
+### Quick Example: First-Time Sync
+
+```bash
+$ npm run sync-historical
+
+✅ Found 127 daily puzzle score(s) across 15 date(s)
+
+Options:
+  1) Preview what will be synced (dry run)
+  2) Sync all scores to historical databases
+  3) Sync specific date(s) only
+  4) Exit
+
+Select an option (1-4): 1  # Preview first
+
+# Review output...
+
+Select an option (1-4): 2  # Then sync
+
+Proceed with sync? (yes/no): yes
+
+🚀 Starting sync...
+
+✅ Sync Complete!
+
+📊 Summary:
+   Total scores processed: 127
+   Successfully added: 127
+   Skipped (duplicates): 0
+   New databases created: 15
+```
+
+## Selection Syntax
+
+- **Single dates**: `5` or `10`
+- **Multiple dates**: `1,5,10,15`
+- **Range**: `1-10` (dates 1 through 10)
+- **Mixed**: `1,3-5,8,10-15`
+- **All**: `all` (sync everything)
+
+## Common Scenarios
+
+### Initial Deployment
+You just pushed the historical feature to production.
+```bash
+npm run sync-historical
+# Preview → Sync all
+```
+
+### After Data Import
+Imported old scores from backup.
+```bash
+npm run sync-historical
+# Review → Sync needed dates
+```
+
+### Recovery from Deletion
+Accidentally deleted historical databases.
+```bash
+npm run sync-historical
+# Sync all to recreate
+```
+
+## Notes About All Scripts
 
 - Scores are immediately added to the database
-- No duplicate checking - you can add the same score multiple times
-- The script shows only the top 5, but all scores are stored
-- Regular game scores and daily puzzle scores are tracked separately
+- **add-score.js**: No duplicate checking (you can add the same score multiple times)
+- **migrate-scores.js**: Has duplicate detection, auto-archives to historical when migrating to daily
+- **sync-historical.js**: Automatically skips duplicates, safe to run multiple times
 - The leaderboard in the game will show all scores in the database
+- Daily puzzle scores and regular scores are tracked separately
+- Historical databases preserve daily puzzle scores by date (SGT timezone)
