@@ -558,10 +558,21 @@ async function handleGameOver(won) {
     const puzzleType = isDailyPuzzle ? 'Daily Puzzle' : difficulty;
     
     setTimeout(async () => {
-      const playerName = prompt(`🎉 Congratulations! You won the ${puzzleType} in ${formatTime(time)}!\n\nEnter your name for the leaderboard:`);
+      // Load cached player name from localStorage
+      const cachedName = localStorage.getItem('playerName') || '';
+      
+      const playerName = prompt(
+        `🎉 Congratulations! You won the ${puzzleType} in ${formatTime(time)}!\n\nEnter your name for the leaderboard:`,
+        cachedName // Pre-fill with cached name
+      );
       
       if (playerName && playerName.trim()) {
-        const success = await submitScore(playerName.trim(), time, difficulty, isDailyPuzzle);
+        const trimmedName = playerName.trim();
+        
+        // Save the player name to localStorage for future use
+        localStorage.setItem('playerName', trimmedName);
+        
+        const success = await submitScore(trimmedName, time, difficulty, isDailyPuzzle);
         if (success) {
           alert('Score saved to leaderboard!');
         } else {
