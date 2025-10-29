@@ -139,13 +139,14 @@ async function startDailyPuzzle(difficulty) {
     document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(difficulty)?.classList.add('active');
     
-    // Show daily puzzle badge with today's date
+    // Show daily puzzle badge with today's date (Singapore Time)
     if (dailyPuzzleBadge) {
       const today = new Date();
       const dateStr = today.toLocaleDateString('en-US', { 
         month: 'short', 
         day: 'numeric', 
-        year: 'numeric' 
+        year: 'numeric',
+        timeZone: 'Asia/Singapore'
       });
       
       // Get difficulty icon
@@ -714,13 +715,14 @@ newGameBtn.addEventListener('click', startNewGame);
 
 // Daily puzzle modal functions
 function showDailyPuzzleModal() {
-  // Update date displays
+  // Update date displays (using Singapore Time)
   const today = new Date();
   const dateStr = today.toLocaleDateString('en-US', { 
     weekday: 'long',
     month: 'long', 
     day: 'numeric', 
-    year: 'numeric' 
+    year: 'numeric',
+    timeZone: 'Asia/Singapore'
   });
   
   const modalDate = document.getElementById('dailyModalDate');

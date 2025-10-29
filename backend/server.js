@@ -400,11 +400,18 @@ class MinesweeperGame {
 const SEED_SALT = process.env.DAILY_SEED_SALT || 'minesweeper-daily-puzzle-salt-2025';
 
 // Get daily puzzle seed based on current date and difficulty using cryptographic hashing
+// Uses Singapore Time (SGT/UTC+8) for consistent daily reset
 function getDailySeed(difficulty = 'medium') {
-  const today = new Date();
-  const year = today.getUTCFullYear();
-  const month = String(today.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(today.getUTCDate()).padStart(2, '0');
+  const now = new Date();
+  
+  // Convert to Singapore Time (UTC+8)
+  const sgtOffset = 8 * 60; // 8 hours in minutes
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000); // Get UTC time
+  const sgtTime = new Date(utcTime + (sgtOffset * 60000)); // Add SGT offset
+  
+  const year = sgtTime.getFullYear();
+  const month = String(sgtTime.getMonth() + 1).padStart(2, '0');
+  const day = String(sgtTime.getDate()).padStart(2, '0');
   
   // Create a string combining date, difficulty, and secret salt
   const seedString = `${year}-${month}-${day}|${difficulty}|${SEED_SALT}`;
