@@ -763,6 +763,21 @@ h1 {
   color: #667eea;
 }
 
+/* Highlight current user's scores */
+.leaderboard-table tr.current-user {
+  background: linear-gradient(90deg, #e8f5e9 0%, #f1f8e9 100%);
+  border-left: 4px solid #4caf50;
+  font-weight: 500;
+}
+
+.leaderboard-table tr.current-user:hover {
+  background: linear-gradient(90deg, #c8e6c9 0%, #dcedc8 100%);
+}
+
+.leaderboard-table tr.current-user td {
+  border-bottom: 1px solid #a5d6a7;
+}
+
 .no-scores {
   text-align: center;
   padding: 40px 20px;
@@ -901,6 +916,17 @@ h1 {
   font-weight: 600;
 }
 
+/* Current user highlighting in grouped tables */
+.leaderboard-table.grouped tr.current-user td {
+  background: linear-gradient(90deg, #e8f5e9 0%, #f1f8e9 100%) !important;
+  border-left: 4px solid #4caf50;
+  font-weight: 600 !important;
+}
+
+.leaderboard-table.grouped tr.current-user:hover td {
+  background: linear-gradient(90deg, #c8e6c9 0%, #dcedc8 100%) !important;
+}
+
 /* Daily Leaderboard Single Difficulty View */
 .daily-leaderboard-single {
   background: white;
@@ -984,6 +1010,17 @@ h1 {
 
 .leaderboard-table.single tr:hover {
   background: rgba(102, 126, 234, 0.05);
+}
+
+/* Current user highlighting in single view - override rank backgrounds */
+.leaderboard-table.single tr.current-user td {
+  background: linear-gradient(90deg, #e8f5e9 0%, #f1f8e9 100%) !important;
+  border-left: 4px solid #4caf50;
+  font-weight: 600 !important;
+}
+
+.leaderboard-table.single tr.current-user:hover td {
+  background: linear-gradient(90deg, #c8e6c9 0%, #dcedc8 100%) !important;
 }
 
 /* Developer Mode */

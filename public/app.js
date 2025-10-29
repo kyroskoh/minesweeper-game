@@ -1071,10 +1071,14 @@ function displayLeaderboard(scores, showDifficulty = false) {
   
   processedScores.forEach((score, index) => {
     const date = new Date(score.date).toLocaleDateString();
+    const isCurrentUser = score.device_id && score.device_id === DEVICE_ID;
+    const userClass = isCurrentUser ? ' class="current-user"' : '';
+    const userIndicator = isCurrentUser ? ' 👤' : '';
+    
     html += `
-      <tr>
+      <tr${userClass}>
         <td>${index + 1}</td>
-        <td>${score.displayName}</td>
+        <td>${score.displayName}${userIndicator}</td>
         ${showDifficulty ? `<td>${score.difficulty}</td>` : ''}
         <td>${formatTimeWithTotal(score.time)}</td>
         <td>${date}</td>
@@ -1205,10 +1209,14 @@ function displayDailyLeaderboard(selectedDifficulty) {
       
       processedScores.forEach((score, index) => {
         const date = new Date(score.date).toLocaleDateString();
+        const isCurrentUser = score.device_id && score.device_id === DEVICE_ID;
+        const userClass = isCurrentUser ? ' class="current-user"' : '';
+        const userIndicator = isCurrentUser ? ' 👤' : '';
+        
         html += `
-          <tr>
+          <tr${userClass}>
             <td>${index + 1}</td>
-            <td>${score.displayName}</td>
+            <td>${score.displayName}${userIndicator}</td>
             <td>${formatTimeWithTotal(score.time)}</td>
             <td>${date}</td>
           </tr>
@@ -1282,10 +1290,14 @@ function displayDailyLeaderboard(selectedDifficulty) {
       
       processedScores.forEach((score, index) => {
         const date = new Date(score.date).toLocaleDateString();
+        const isCurrentUser = score.device_id && score.device_id === DEVICE_ID;
+        const userClass = isCurrentUser ? ' current-user' : '';
+        const userIndicator = isCurrentUser ? ' 👤' : '';
+        
         html += `
-          <tr class="rank-${index + 1}">
+          <tr class="rank-${index + 1}${userClass}">
             <td>${index + 1}</td>
-            <td>${score.displayName}</td>
+            <td>${score.displayName}${userIndicator}</td>
             <td>${formatTimeWithTotal(score.time)}</td>
             <td>${date}</td>
           </tr>
