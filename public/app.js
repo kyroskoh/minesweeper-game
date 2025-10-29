@@ -996,10 +996,21 @@ async function loadLeaderboard(difficulty) {
         // Load historical data for selected date
         await loadHistoricalLeaderboard(selectedHistoryDate);
       } else {
-        // Group daily puzzle scores by difficulty (top 10 each)
+        // Get today's date in SGT (YYYY-MM-DD format)
+        const now = new Date();
+        const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+        const sgtDate = new Date(utcTime + (8 * 60 * 60000));
+        const todaySGT = sgtDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        
+        // Group daily puzzle scores by difficulty (only TODAY's scores, top 10 each)
         dailyLeaderboardData = {};
         Object.keys(data.leaderboard).forEach(diff => {
-          const scores = data.leaderboard[diff].filter(s => s.is_daily === 1);
+          const scores = data.leaderboard[diff].filter(s => {
+            if (s.is_daily !== 1) return false;
+            // Check if score date matches today (SGT)
+            const scoreDate = new Date(s.date).toISOString().split('T')[0];
+            return scoreDate === todaySGT;
+          });
           if (scores.length > 0) {
             dailyLeaderboardData[diff] = scores.slice(0, 10); // Top 10 per difficulty
           }
