@@ -277,13 +277,84 @@ async function migrateScores(db, fromType, toType) {
     return;
   }
   
+  // Helper function to get historical database path (same logic as backend)
+  function getHistoricalDbPath(dateString) {
+    const dateObj = new Date(dateString);
+    const utcTime = dateObj.getTime() + (dateObj.getTimezoneOffset() * 60000);
+    const sgtDate = new Date(utcTime + (8 * 60 * 60000));
+    const year = sgtDate.getUTCFullYear();
+    const month = String(sgtDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(sgtDate.getUTCDate()).padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    const filename = `historical_daily_leaderboard_${dateStr}.db`;
+    return path.join(__dirname, '../historical_daily', filename);
+  }
+  
   // Perform migration
+  let historicalCount = 0;
   indicesToMigrate.forEach(idx => {
     const score = scores[idx];
     db.run('UPDATE leaderboard SET is_daily = ? WHERE id = ?', [toType, score.id]);
+    
+    // If migrating TO daily (toType = 1), also archive to historical database
+    if (toType === 1) {
+      try {
+        const historicalDbPath = getHistoricalDbPath(score.date);
+        const historicalDir = path.dirname(historicalDbPath);
+        
+        if (!fs.existsSync(historicalDir)) {
+          fs.mkdirSync(historicalDir, { recursive: true });
+        }
+        
+        let historicalBuffer;
+        let isNewHistoricalDb = false;
+        
+        try {
+          historicalBuffer = fs.readFileSync(historicalDbPath);
+        } catch (error) {
+          historicalBuffer = null;
+          isNewHistoricalDb = true;
+        }
+        
+        const historicalDb = new SQL.Database(historicalBuffer);
+        
+        if (isNewHistoricalDb) {
+          historicalDb.run(`
+            CREATE TABLE IF NOT EXISTS daily_leaderboard (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              time INTEGER NOT NULL,
+              difficulty TEXT NOT NULL,
+              date TEXT NOT NULL,
+              device_id TEXT
+            )
+          `);
+          historicalDb.run(`
+            CREATE INDEX IF NOT EXISTS idx_difficulty_time 
+            ON daily_leaderboard(difficulty, time)
+          `);
+        }
+        
+        historicalDb.run(
+          'INSERT INTO daily_leaderboard (name, time, difficulty, date, device_id) VALUES (?, ?, ?, ?, ?)',
+          [score.name, score.time, score.difficulty, score.date, score.device_id]
+        );
+        
+        const historicalData = historicalDb.export();
+        const historicalNewBuffer = Buffer.from(historicalData);
+        fs.writeFileSync(historicalDbPath, historicalNewBuffer);
+        historicalDb.close();
+        historicalCount++;
+      } catch (error) {
+        console.error(`⚠️  Could not archive score ID ${score.id}`);
+      }
+    }
   });
   
   console.log(`\n✅ Successfully migrated ${indicesToMigrate.length} score(s)!`);
+  if (toType === 1 && historicalCount > 0) {
+    console.log(`✅ Archived ${historicalCount} score(s) to historical database!`);
+  }
 }
 
 async function migrateById(db) {
@@ -332,6 +403,74 @@ async function migrateById(db) {
   
   const newIsDaily = score.is_daily === 1 ? 0 : 1;
   db.run('UPDATE leaderboard SET is_daily = ? WHERE id = ?', [newIsDaily, scoreId]);
+  
+  // If migrating TO daily, also archive to historical database
+  if (newIsDaily === 1) {
+    try {
+      // Helper function
+      function getHistoricalDbPath(dateString) {
+        const dateObj = new Date(dateString);
+        const utcTime = dateObj.getTime() + (dateObj.getTimezoneOffset() * 60000);
+        const sgtDate = new Date(utcTime + (8 * 60 * 60000));
+        const year = sgtDate.getUTCFullYear();
+        const month = String(sgtDate.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(sgtDate.getUTCDate()).padStart(2, '0');
+        const dateStr = `${year}${month}${day}`;
+        const filename = `historical_daily_leaderboard_${dateStr}.db`;
+        return path.join(__dirname, '../historical_daily', filename);
+      }
+      
+      const historicalDbPath = getHistoricalDbPath(score.date);
+      const historicalDir = path.dirname(historicalDbPath);
+      
+      if (!fs.existsSync(historicalDir)) {
+        fs.mkdirSync(historicalDir, { recursive: true });
+      }
+      
+      let historicalBuffer;
+      let isNewHistoricalDb = false;
+      
+      try {
+        historicalBuffer = fs.readFileSync(historicalDbPath);
+      } catch (error) {
+        historicalBuffer = null;
+        isNewHistoricalDb = true;
+      }
+      
+      const historicalDb = new SQL.Database(historicalBuffer);
+      
+      if (isNewHistoricalDb) {
+        historicalDb.run(`
+          CREATE TABLE IF NOT EXISTS daily_leaderboard (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            time INTEGER NOT NULL,
+            difficulty TEXT NOT NULL,
+            date TEXT NOT NULL,
+            device_id TEXT
+          )
+        `);
+        historicalDb.run(`
+          CREATE INDEX IF NOT EXISTS idx_difficulty_time 
+          ON daily_leaderboard(difficulty, time)
+        `);
+      }
+      
+      historicalDb.run(
+        'INSERT INTO daily_leaderboard (name, time, difficulty, date, device_id) VALUES (?, ?, ?, ?, ?)',
+        [score.name, score.time, score.difficulty, score.date, score.device_id]
+      );
+      
+      const historicalData = historicalDb.export();
+      const historicalNewBuffer = Buffer.from(historicalData);
+      fs.writeFileSync(historicalDbPath, historicalNewBuffer);
+      historicalDb.close();
+      
+      console.log(`✅ Score archived to historical database!`);
+    } catch (error) {
+      console.error(`⚠️  Could not archive to historical database`);
+    }
+  }
   
   console.log(`\n✅ Score migrated from ${currentType} to ${newType}!`);
 }

@@ -164,6 +164,24 @@ async function addScore() {
   console.log(`   Device ID: ${deviceId || '(none - legacy score)'}`);
 
 
+  // Helper function to get historical database path (same logic as backend)
+  function getHistoricalDbPath(dateString) {
+    const dateObj = new Date(dateString);
+    
+    // Convert to SGT (UTC+8)
+    const utcTime = dateObj.getTime() + (dateObj.getTimezoneOffset() * 60000);
+    const sgtDate = new Date(utcTime + (8 * 60 * 60000));
+    
+    const year = sgtDate.getUTCFullYear();
+    const month = String(sgtDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(sgtDate.getUTCDate()).padStart(2, '0');
+    
+    const dateStr = `${year}${month}${day}`;
+    const filename = `historical_daily_leaderboard_${dateStr}.db`;
+    
+    return path.join(__dirname, '../historical_daily', filename);
+  }
+
   // Initialize database
   const dbPath = path.join(__dirname, '../leaderboard.db');
   
@@ -186,13 +204,80 @@ async function addScore() {
       [name, timeInSeconds, difficulty, date, isDailyPuzzle ? 1 : 0, deviceId]
     );
     
-    // Save database
+    // Save main database
     const data = db.export();
     const newBuffer = Buffer.from(data);
     fs.writeFileSync(dbPath, newBuffer);
     db.close();
     
-    console.log('✅ Score added successfully!');
+    console.log('✅ Score added to main leaderboard!');
+    
+    // If this is a daily puzzle score, also save to historical database
+    if (isDailyPuzzle) {
+      try {
+        const historicalDbPath = getHistoricalDbPath(date);
+        const historicalDir = path.dirname(historicalDbPath);
+        
+        // Ensure historical directory exists
+        if (!fs.existsSync(historicalDir)) {
+          fs.mkdirSync(historicalDir, { recursive: true });
+          console.log('📁 Created historical_daily directory');
+        }
+        
+        // Load or create historical database
+        let historicalBuffer;
+        let isNewHistoricalDb = false;
+        
+        try {
+          historicalBuffer = fs.readFileSync(historicalDbPath);
+        } catch (error) {
+          historicalBuffer = null;
+          isNewHistoricalDb = true;
+        }
+        
+        const historicalDb = new SQL.Database(historicalBuffer);
+        
+        // Create table if new database
+        if (isNewHistoricalDb) {
+          historicalDb.run(`
+            CREATE TABLE IF NOT EXISTS daily_leaderboard (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              time INTEGER NOT NULL,
+              difficulty TEXT NOT NULL,
+              date TEXT NOT NULL,
+              device_id TEXT
+            )
+          `);
+          
+          historicalDb.run(`
+            CREATE INDEX IF NOT EXISTS idx_difficulty_time 
+            ON daily_leaderboard(difficulty, time)
+          `);
+          
+          console.log('📅 Created new historical database');
+        }
+        
+        // Insert into historical database
+        historicalDb.run(
+          'INSERT INTO daily_leaderboard (name, time, difficulty, date, device_id) VALUES (?, ?, ?, ?, ?)',
+          [name, timeInSeconds, difficulty, date, deviceId]
+        );
+        
+        // Save historical database
+        const historicalData = historicalDb.export();
+        const historicalNewBuffer = Buffer.from(historicalData);
+        fs.writeFileSync(historicalDbPath, historicalNewBuffer);
+        
+        const historicalFilename = path.basename(historicalDbPath);
+        console.log(`✅ Score archived to historical database: ${historicalFilename}`);
+        
+        historicalDb.close();
+      } catch (error) {
+        console.error('⚠️  Warning: Could not save to historical database:', error.message);
+        console.log('   Score was still saved to main leaderboard.');
+      }
+    }
     
     // Show current top 5 for this difficulty (filtered by daily/regular)
     const SQL2 = await initSqlJs();
