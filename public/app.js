@@ -1027,13 +1027,16 @@ function displayLeaderboard(scores, showDifficulty = false) {
       };
     }
     
+    // Handle legacy scores without device_id (treat each as unique)
+    const deviceId = score.device_id || `legacy_${score.id || Math.random()}`;
+    
     // Track device IDs for this name
-    const deviceIndex = nameDeviceCounts[nameKey].devices.indexOf(score.device_id);
+    const deviceIndex = nameDeviceCounts[nameKey].devices.indexOf(deviceId);
     let deviceCount = 1;
     
     if (deviceIndex === -1) {
       // New device for this name
-      nameDeviceCounts[nameKey].devices.push(score.device_id);
+      nameDeviceCounts[nameKey].devices.push(deviceId);
       nameDeviceCounts[nameKey].total++;
       deviceCount = nameDeviceCounts[nameKey].total;
     } else {
@@ -1179,11 +1182,14 @@ function displayDailyLeaderboard(selectedDifficulty) {
           nameDeviceCounts[nameKey] = { devices: [], total: 0 };
         }
         
-        const deviceIndex = nameDeviceCounts[nameKey].devices.indexOf(score.device_id);
+        // Handle legacy scores without device_id (treat each as unique)
+        const deviceId = score.device_id || `legacy_${score.id || Math.random()}`;
+        
+        const deviceIndex = nameDeviceCounts[nameKey].devices.indexOf(deviceId);
         let deviceCount = 1;
         
         if (deviceIndex === -1) {
-          nameDeviceCounts[nameKey].devices.push(score.device_id);
+          nameDeviceCounts[nameKey].devices.push(deviceId);
           nameDeviceCounts[nameKey].total++;
           deviceCount = nameDeviceCounts[nameKey].total;
         } else {
@@ -1253,11 +1259,14 @@ function displayDailyLeaderboard(selectedDifficulty) {
           nameDeviceCounts[nameKey] = { devices: [], total: 0 };
         }
         
-        const deviceIndex = nameDeviceCounts[nameKey].devices.indexOf(score.device_id);
+        // Handle legacy scores without device_id (treat each as unique)
+        const deviceId = score.device_id || `legacy_${score.id || Math.random()}`;
+        
+        const deviceIndex = nameDeviceCounts[nameKey].devices.indexOf(deviceId);
         let deviceCount = 1;
         
         if (deviceIndex === -1) {
-          nameDeviceCounts[nameKey].devices.push(score.device_id);
+          nameDeviceCounts[nameKey].devices.push(deviceId);
           nameDeviceCounts[nameKey].total++;
           deviceCount = nameDeviceCounts[nameKey].total;
         } else {
