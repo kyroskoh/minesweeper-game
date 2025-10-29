@@ -559,18 +559,34 @@ async function handleGameOver(won) {
     
     setTimeout(async () => {
       // Load cached player name from localStorage
-      const cachedName = localStorage.getItem('playerName') || '';
+      let cachedName = '';
+      try {
+        cachedName = localStorage.getItem('playerName') || '';
+        console.log('Cached player name retrieved:', cachedName ? cachedName : '(empty)');
+      } catch (e) {
+        console.warn('Could not access localStorage:', e);
+      }
       
-      const playerName = prompt(
-        `🎉 Congratulations! You won the ${puzzleType} in ${formatTime(time)}!\n\nEnter your name for the leaderboard:`,
-        cachedName // Pre-fill with cached name
-      );
+      // Create prompt message with indication if there's a cached name
+      let promptMessage = `🎉 Congratulations! You won the ${puzzleType} in ${formatTime(time)}!\n\n`;
+      if (cachedName) {
+        promptMessage += `Enter your name for the leaderboard (or keep "${cachedName}"):`;
+      } else {
+        promptMessage += `Enter your name for the leaderboard:`;
+      }
+      
+      const playerName = prompt(promptMessage, cachedName);
       
       if (playerName && playerName.trim()) {
         const trimmedName = playerName.trim();
         
         // Save the player name to localStorage for future use
-        localStorage.setItem('playerName', trimmedName);
+        try {
+          localStorage.setItem('playerName', trimmedName);
+          console.log('Player name saved to cache:', trimmedName);
+        } catch (e) {
+          console.warn('Could not save to localStorage:', e);
+        }
         
         const success = await submitScore(trimmedName, time, difficulty, isDailyPuzzle);
         if (success) {
