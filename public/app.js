@@ -715,62 +715,118 @@ newGameBtn.addEventListener('click', startNewGame);
 
 // Calculate time until next daily puzzle (midnight SGT)
 function getNextDailyPuzzleTime() {
-  const now = new Date();
-  
-  // Get current time in SGT
-  const sgtTimeStr = now.toLocaleString('en-US', { timeZone: 'Asia/Singapore' });
-  const sgtNow = new Date(sgtTimeStr);
-  
-  // Get next midnight SGT
-  const nextMidnightSGT = new Date(sgtNow);
-  nextMidnightSGT.setHours(24, 0, 0, 0);
-  
-  // Convert back to local time
-  const sgtMidnightStr = nextMidnightSGT.toLocaleString('en-US', { timeZone: 'Asia/Singapore' });
-  const nextMidnight = new Date(sgtMidnightStr);
-  
-  return nextMidnight;
+  try {
+    const now = new Date();
+    
+    // Method 1: Try using toLocaleString with timezone (may fail on some mobile browsers)
+    try {
+      const sgtTimeStr = now.toLocaleString('en-US', { timeZone: 'Asia/Singapore' });
+      const sgtNow = new Date(sgtTimeStr);
+      
+      // Get next midnight SGT
+      const nextMidnightSGT = new Date(sgtNow);
+      nextMidnightSGT.setHours(24, 0, 0, 0);
+      
+      // Calculate the difference
+      const diffMs = nextMidnightSGT - sgtNow;
+      
+      // Add this difference to current time to get local equivalent
+      const nextMidnight = new Date(now.getTime() + diffMs);
+      
+      return nextMidnight;
+    } catch (e) {
+      // Fallback: Manual calculation
+      console.warn('Timezone conversion failed, using manual calculation:', e);
+      
+      // Calculate SGT offset manually (UTC+8)
+      const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const sgtTime = new Date(utcTime + (8 * 60 * 60000)); // Add 8 hours
+      
+      // Get next midnight SGT
+      const nextMidnightSGT = new Date(sgtTime);
+      nextMidnightSGT.setUTCHours(24, 0, 0, 0);
+      
+      // Calculate how many ms until midnight SGT
+      const msUntilMidnight = nextMidnightSGT - sgtTime;
+      
+      // Add to current local time
+      return new Date(now.getTime() + msUntilMidnight);
+    }
+  } catch (error) {
+    console.error('Error calculating next daily puzzle time:', error);
+    // Return 24 hours from now as ultimate fallback
+    return new Date(Date.now() + 24 * 60 * 60 * 1000);
+  }
 }
 
 function updateDailyCountdown() {
   const countdownElement = document.getElementById('dailyCountdown');
   if (!countdownElement) return;
   
-  const now = new Date();
-  const nextPuzzle = getNextDailyPuzzleTime();
-  const diff = nextPuzzle - now;
-  
-  if (diff <= 0) {
-    countdownElement.textContent = '⏰ New puzzle available now! Refresh the page.';
-    return;
-  }
-  
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-  
-  // Get user's local time for next puzzle
-  const localTimeStr = nextPuzzle.toLocaleTimeString('en-US', { 
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true 
-  });
-  
-  const localDateStr = nextPuzzle.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric'
-  });
-  
-  // Check if user is in SGT timezone
-  const userOffset = -now.getTimezoneOffset() / 60;
-  const isInSGT = userOffset === 8;
-  
-  if (isInSGT) {
-    countdownElement.textContent = `⏰ Next puzzle in ${hours}h ${minutes}m ${seconds}s`;
+  try {
+    const now = new Date();
+    const nextPuzzle = getNextDailyPuzzleTime();
+    const diff = nextPuzzle - now;
+    
+    if (diff <= 0) {
+      countdownElement.textContent = '⏰ New puzzle available now! Refresh the page.';
+      countdownElement.style.display = 'inline-block';
+      return;
+    }
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    // Validate calculated time
+    if (hours < 0 || hours > 24 || isNaN(hours)) {
+      console.warn('Invalid countdown calculation:', { hours, minutes, seconds, diff });
+      countdownElement.textContent = '⏰ Next puzzle at midnight SGT';
+      countdownElement.style.display = 'inline-block';
+      return;
+    }
+    
+    // Try to get user's local time for next puzzle
+    let localTimeStr = '';
+    let localDateStr = '';
+    
+    try {
+      localTimeStr = nextPuzzle.toLocaleTimeString('en-US', { 
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true 
+      });
+      
+      localDateStr = nextPuzzle.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (e) {
+      console.warn('Could not format local time:', e);
+      // Will show simplified version without local time
+    }
+    
+    // Check if user is in SGT timezone
+    const userOffset = -now.getTimezoneOffset() / 60;
+    const isInSGT = Math.abs(userOffset - 8) < 0.5; // Allow small variance
+    
+    if (isInSGT || !localTimeStr) {
+      countdownElement.textContent = `⏰ Next puzzle in ${hours}h ${minutes}m ${seconds}s`;
+      countdownElement.classList.remove('local-time');
+    } else {
+      countdownElement.textContent = `⏰ Next puzzle in ${hours}h ${minutes}m ${seconds}s (${localTimeStr} on ${localDateStr})`;
+      countdownElement.classList.add('local-time');
+    }
+    
+    // Make sure it's visible
+    countdownElement.style.display = 'inline-block';
+    
+  } catch (error) {
+    console.error('Error updating countdown:', error);
+    // Fallback display
+    countdownElement.textContent = '⏰ New puzzle daily at midnight SGT';
+    countdownElement.style.display = 'inline-block';
     countdownElement.classList.remove('local-time');
-  } else {
-    countdownElement.textContent = `⏰ Next puzzle in ${hours}h ${minutes}m ${seconds}s (${localTimeStr} your time on ${localDateStr})`;
-    countdownElement.classList.add('local-time');
   }
 }
 
@@ -793,8 +849,10 @@ function showDailyPuzzleModal() {
     modalDate.textContent = dateStr;
   }
   
-  // Update countdown immediately
-  updateDailyCountdown();
+  // Update countdown immediately with a small delay to ensure DOM is ready
+  setTimeout(() => {
+    updateDailyCountdown();
+  }, 50);
   
   // Update countdown every second
   if (countdownInterval) {
