@@ -45,7 +45,8 @@ initSqlJs().then(SQL => {
       time INTEGER NOT NULL,
       difficulty TEXT NOT NULL,
       date TEXT NOT NULL,
-      is_daily INTEGER DEFAULT 0
+      is_daily INTEGER DEFAULT 0,
+      device_id TEXT
     )
   `);
   
@@ -53,6 +54,15 @@ initSqlJs().then(SQL => {
   try {
     db.run('ALTER TABLE leaderboard ADD COLUMN is_daily INTEGER DEFAULT 0');
     console.log('Added is_daily column to existing database');
+  } catch (err) {
+    // Column already exists, ignore
+  }
+  
+  // Add device_id column if it doesn't exist (for existing databases)
+  try {
+    db.run('ALTER TABLE leaderboard ADD COLUMN device_id TEXT');
+    console.log('Added device_id column to existing database');
+    saveDatabase();
   } catch (err) {
     // Column already exists, ignore
   }
@@ -540,7 +550,7 @@ app.get('/api/game/:gameId/dev', (req, res) => {
 });
 
 app.post('/api/leaderboard', (req, res) => {
-  const { name, time, difficulty, date, isDailyPuzzle = false } = req.body;
+  const { name, time, difficulty, date, isDailyPuzzle = false, deviceId } = req.body;
   
   if (!name || !time || !difficulty) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -551,13 +561,14 @@ app.post('/api/leaderboard', (req, res) => {
     time,
     difficulty,
     date: date || new Date().toISOString(), // Use provided date or current time
-    isDailyPuzzle: isDailyPuzzle ? 1 : 0
+    isDailyPuzzle: isDailyPuzzle ? 1 : 0,
+    deviceId: deviceId || null
   };
 
   try {
     db.run(
-      'INSERT INTO leaderboard (name, time, difficulty, date, is_daily) VALUES (?, ?, ?, ?, ?)',
-      [entry.name, entry.time, entry.difficulty, entry.date, entry.isDailyPuzzle]
+      'INSERT INTO leaderboard (name, time, difficulty, date, is_daily, device_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [entry.name, entry.time, entry.difficulty, entry.date, entry.isDailyPuzzle, entry.deviceId]
     );
     saveDatabase();
     
@@ -576,7 +587,7 @@ app.get('/api/leaderboard/:difficulty', async (req, res) => {
     await reloadDatabase();
     
     const stmt = db.prepare(
-      'SELECT name, time, difficulty, date, is_daily FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
+      'SELECT name, time, difficulty, date, is_daily, device_id FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
     );
     stmt.bind([difficulty]);
     
@@ -603,7 +614,7 @@ app.get('/api/leaderboard', async (req, res) => {
     Object.keys(difficultyNames).forEach(key => {
       const diffName = difficultyNames[key];
       const stmt = db.prepare(
-        'SELECT name, time, difficulty, date, is_daily FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
+        'SELECT name, time, difficulty, date, is_daily, device_id FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
       );
       stmt.bind([diffName]);
       

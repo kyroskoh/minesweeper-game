@@ -17,6 +17,23 @@ let isUpdating = false; // Prevent multiple simultaneous updates
 const SECRET_CODE = 'showmines'; // Text code
 const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']; // Konami code
 
+// Generate or retrieve unique device ID
+function getDeviceId() {
+  let deviceId = localStorage.getItem('deviceId');
+  
+  if (!deviceId) {
+    // Generate a unique device ID using timestamp + random string
+    deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('deviceId', deviceId);
+    console.log('New device ID generated:', deviceId);
+  }
+  
+  return deviceId;
+}
+
+// Initialize device ID on load
+const DEVICE_ID = getDeviceId();
+
 const boardElement = document.getElementById('board');
 const minesCountElement = document.getElementById('minesCount');
 const flagsCountElement = document.getElementById('flagsCount');
@@ -633,6 +650,7 @@ function addOfflineScore(name, time, difficulty, isDailyPuzzle = false) {
     time,
     difficulty,
     isDailyPuzzle,
+    deviceId: DEVICE_ID,
     date: new Date().toISOString(),
     timestamp: Date.now()
   });
@@ -673,7 +691,8 @@ async function syncOfflineScores() {
           time: score.time,
           difficulty: score.difficulty,
           date: score.date,
-          isDailyPuzzle: score.isDailyPuzzle || false
+          isDailyPuzzle: score.isDailyPuzzle || false,
+          deviceId: score.deviceId || DEVICE_ID
         })
       });
       
@@ -710,6 +729,7 @@ async function submitScore(name, time, difficulty, isDailyPuzzle = false) {
         time, 
         difficulty,
         isDailyPuzzle,
+        deviceId: DEVICE_ID,
         date: new Date().toISOString()
       })
     });
@@ -994,6 +1014,44 @@ function displayLeaderboard(scores, showDifficulty = false) {
     return;
   }
   
+  // Add duplicate name counters based on device_id
+  const nameDeviceCounts = {};
+  const processedScores = scores.map(score => {
+    const nameKey = score.name.toLowerCase();
+    
+    // Initialize tracking for this name if needed
+    if (!nameDeviceCounts[nameKey]) {
+      nameDeviceCounts[nameKey] = {
+        devices: [],
+        total: 0
+      };
+    }
+    
+    // Track device IDs for this name
+    const deviceIndex = nameDeviceCounts[nameKey].devices.indexOf(score.device_id);
+    let deviceCount = 1;
+    
+    if (deviceIndex === -1) {
+      // New device for this name
+      nameDeviceCounts[nameKey].devices.push(score.device_id);
+      nameDeviceCounts[nameKey].total++;
+      deviceCount = nameDeviceCounts[nameKey].total;
+    } else {
+      // Existing device - use the existing count
+      deviceCount = deviceIndex + 1;
+    }
+    
+    // Only show count if there are multiple devices with this name
+    const displayName = nameDeviceCounts[nameKey].total > 1 || nameDeviceCounts[nameKey].devices.length > 1
+      ? `${score.name} (${deviceCount})`
+      : score.name;
+    
+    return {
+      ...score,
+      displayName
+    };
+  });
+  
   let html = `
     <table class="leaderboard-table">
       <thead>
@@ -1008,12 +1066,12 @@ function displayLeaderboard(scores, showDifficulty = false) {
       <tbody>
   `;
   
-  scores.forEach((score, index) => {
+  processedScores.forEach((score, index) => {
     const date = new Date(score.date).toLocaleDateString();
     html += `
       <tr>
         <td>${index + 1}</td>
-        <td>${score.name}</td>
+        <td>${score.displayName}</td>
         ${showDifficulty ? `<td>${score.difficulty}</td>` : ''}
         <td>${formatTimeWithTotal(score.time)}</td>
         <td>${date}</td>
@@ -1112,12 +1170,39 @@ function displayDailyLeaderboard(selectedDifficulty) {
             <tbody>
       `;
       
-      scores.forEach((score, index) => {
+      // Add duplicate name counters for this difficulty group
+      const nameDeviceCounts = {};
+      const processedScores = scores.map(score => {
+        const nameKey = score.name.toLowerCase();
+        
+        if (!nameDeviceCounts[nameKey]) {
+          nameDeviceCounts[nameKey] = { devices: [], total: 0 };
+        }
+        
+        const deviceIndex = nameDeviceCounts[nameKey].devices.indexOf(score.device_id);
+        let deviceCount = 1;
+        
+        if (deviceIndex === -1) {
+          nameDeviceCounts[nameKey].devices.push(score.device_id);
+          nameDeviceCounts[nameKey].total++;
+          deviceCount = nameDeviceCounts[nameKey].total;
+        } else {
+          deviceCount = deviceIndex + 1;
+        }
+        
+        const displayName = nameDeviceCounts[nameKey].total > 1
+          ? `${score.name} (${deviceCount})`
+          : score.name;
+        
+        return { ...score, displayName };
+      });
+      
+      processedScores.forEach((score, index) => {
         const date = new Date(score.date).toLocaleDateString();
         html += `
           <tr>
             <td>${index + 1}</td>
-            <td>${score.name}</td>
+            <td>${score.displayName}</td>
             <td>${formatTimeWithTotal(score.time)}</td>
             <td>${date}</td>
           </tr>
@@ -1159,12 +1244,39 @@ function displayDailyLeaderboard(selectedDifficulty) {
             <tbody>
       `;
       
-      scores.forEach((score, index) => {
+      // Add duplicate name counters for single difficulty view
+      const nameDeviceCounts = {};
+      const processedScores = scores.map(score => {
+        const nameKey = score.name.toLowerCase();
+        
+        if (!nameDeviceCounts[nameKey]) {
+          nameDeviceCounts[nameKey] = { devices: [], total: 0 };
+        }
+        
+        const deviceIndex = nameDeviceCounts[nameKey].devices.indexOf(score.device_id);
+        let deviceCount = 1;
+        
+        if (deviceIndex === -1) {
+          nameDeviceCounts[nameKey].devices.push(score.device_id);
+          nameDeviceCounts[nameKey].total++;
+          deviceCount = nameDeviceCounts[nameKey].total;
+        } else {
+          deviceCount = deviceIndex + 1;
+        }
+        
+        const displayName = nameDeviceCounts[nameKey].total > 1
+          ? `${score.name} (${deviceCount})`
+          : score.name;
+        
+        return { ...score, displayName };
+      });
+      
+      processedScores.forEach((score, index) => {
         const date = new Date(score.date).toLocaleDateString();
         html += `
           <tr class="rank-${index + 1}">
             <td>${index + 1}</td>
-            <td>${score.name}</td>
+            <td>${score.displayName}</td>
             <td>${formatTimeWithTotal(score.time)}</td>
             <td>${date}</td>
           </tr>
