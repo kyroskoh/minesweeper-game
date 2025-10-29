@@ -14,7 +14,8 @@ let arrowSequence = [];
 let minePositions = null;
 let isDailyPuzzle = false;
 let isUpdating = false; // Prevent multiple simultaneous updates
-const SECRET_CODE = 'showmines'; // Text code
+const SECRET_CODE = 'showmines'; // Text code for showing mines
+const DEVICE_ID_CODE = 'showid'; // Text code for showing device ID
 const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']; // Konami code
 
 // Generate or retrieve unique device ID
@@ -1419,19 +1420,27 @@ async function fetchMinePositions() {
 document.addEventListener('keydown', async (e) => {
   let codeMatched = false;
   
-  // Track text code (SHOWMINES)
+  // Track text code (SHOWMINES and SHOWID)
   if (e.key.length === 1 && e.key.match(/[a-z]/i)) {
     keySequence += e.key.toLowerCase();
     
-    // Keep only last length of secret code
-    if (keySequence.length > SECRET_CODE.length) {
-      keySequence = keySequence.slice(-SECRET_CODE.length);
+    // Keep only last length of longest secret code
+    const maxCodeLength = Math.max(SECRET_CODE.length, DEVICE_ID_CODE.length);
+    if (keySequence.length > maxCodeLength) {
+      keySequence = keySequence.slice(-maxCodeLength);
     }
     
-    // Check if text sequence matches
+    // Check if text sequence matches SECRET_CODE (developer mode)
     if (keySequence === SECRET_CODE) {
       codeMatched = true;
       keySequence = ''; // Reset sequence
+    }
+    
+    // Check if text sequence matches DEVICE_ID_CODE
+    if (keySequence === DEVICE_ID_CODE) {
+      showDeviceIdInfo();
+      keySequence = ''; // Reset sequence
+      return; // Don't proceed with other code checks
     }
   }
   
@@ -1470,6 +1479,23 @@ document.addEventListener('keydown', async (e) => {
     showNotification(message);
   }
 });
+
+// Show Device ID info
+function showDeviceIdInfo() {
+  const message = `🔑 Your Device ID:\n${DEVICE_ID}\n\n(Copied to clipboard!)`;
+  
+  // Copy to clipboard
+  navigator.clipboard.writeText(DEVICE_ID).then(() => {
+    alert(message);
+  }).catch((err) => {
+    // Fallback if clipboard API fails
+    alert(`🔑 Your Device ID:\n${DEVICE_ID}\n\n(Select and copy manually)`);
+    console.log('Device ID:', DEVICE_ID);
+  });
+  
+  // Show notification
+  showNotification('🔑 Device ID copied to clipboard!');
+}
 
 // Show notification
 function showNotification(message) {

@@ -11,7 +11,7 @@ async function addScore() {
   const args = process.argv.slice(2);
   
   if (args.length < 3) {
-    console.error('\n❌ Usage: node scripts/add-score.js <name> <time> <difficulty> [date] [--daily]');
+    console.error('\n❌ Usage: node scripts/add-score.js <name> <time> <difficulty> [date] [--daily] [--device-id=<id>]');
     console.log('\nExamples:');
     console.log('  node scripts/add-score.js "John Doe" 45 Easy');
     console.log('  node scripts/add-score.js "Jane Smith" 120 Medium');
@@ -19,10 +19,12 @@ async function addScore() {
     console.log('  node scripts/add-score.js "Speed Runner" 2:30 Expert "10/15/2025"');
     console.log('  node scripts/add-score.js "Daily Winner" 90 Pro --daily');
     console.log('  node scripts/add-score.js "Champion" 5:30 Extreme "2025-10-15" --daily');
+    console.log('  node scripts/add-score.js "Alice" 60 Easy --device-id=device_1234567890_abc123');
     console.log('\nValid difficulties: Easy, Medium, Hard, Pro, Expert, Extreme');
     console.log('Time can be in seconds (e.g., 45) or mm:ss format (e.g., 3:45)');
     console.log('Date is optional (defaults to today). Formats: YYYY-MM-DD, MM/DD/YYYY, or any valid date string');
     console.log('Use --daily flag to mark this as a daily puzzle score');
+    console.log('Use --device-id=<id> to specify a device ID (optional)');
     process.exit(1);
   }
 
@@ -34,9 +36,13 @@ async function addScore() {
   const dailyFlagIndex = args.slice(3).findIndex(arg => arg === '--daily');
   const isDailyPuzzle = dailyFlagIndex !== -1;
   
-  // Get date from args, excluding --daily flag
+  // Check for --device-id flag
+  const deviceIdArg = args.slice(3).find(arg => arg.startsWith('--device-id='));
+  const deviceId = deviceIdArg ? deviceIdArg.split('=')[1] : null;
+  
+  // Get date from args, excluding --daily and --device-id flags
   let dateInput = null;
-  const remainingArgs = args.slice(3).filter(arg => arg !== '--daily');
+  const remainingArgs = args.slice(3).filter(arg => arg !== '--daily' && !arg.startsWith('--device-id='));
   if (remainingArgs.length > 0) {
     dateInput = remainingArgs[0].trim();
   }
@@ -155,6 +161,8 @@ async function addScore() {
   console.log(`   Difficulty: ${difficulty}`);
   console.log(`   Type: ${isDailyPuzzle ? '📅 Daily Puzzle' : '🎮 Regular Game'}`);
   console.log(`   Date: ${new Date(date).toLocaleDateString()}`);
+  console.log(`   Device ID: ${deviceId || '(none - legacy score)'}`);
+
 
   // Initialize database
   const dbPath = path.join(__dirname, '../leaderboard.db');
@@ -172,10 +180,10 @@ async function addScore() {
     
     const db = new SQL.Database(buffer);
     
-    // Insert the score with is_daily flag
+    // Insert the score with is_daily flag and device_id
     db.run(
-      'INSERT INTO leaderboard (name, time, difficulty, date, is_daily) VALUES (?, ?, ?, ?, ?)',
-      [name, timeInSeconds, difficulty, date, isDailyPuzzle ? 1 : 0]
+      'INSERT INTO leaderboard (name, time, difficulty, date, is_daily, device_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, timeInSeconds, difficulty, date, isDailyPuzzle ? 1 : 0, deviceId]
     );
     
     // Save database
@@ -190,18 +198,44 @@ async function addScore() {
     const SQL2 = await initSqlJs();
     const db2 = new SQL.Database(fs.readFileSync(dbPath));
     const stmt = db2.prepare(
-      'SELECT name, time FROM leaderboard WHERE difficulty = ? AND is_daily = ? ORDER BY time ASC LIMIT 5'
+      'SELECT name, time, device_id FROM leaderboard WHERE difficulty = ? AND is_daily = ? ORDER BY time ASC LIMIT 5'
     );
     stmt.bind([difficulty, isDailyPuzzle ? 1 : 0]);
     
     const scoreType = isDailyPuzzle ? '📅 Daily Puzzle' : '🎮 Regular';
     console.log(`\n🏆 Top 5 - ${difficulty} (${scoreType}):`);
-    let rank = 1;
+    
+    // Track device counts for duplicate names
+    const nameDeviceCounts = {};
+    const scores = [];
     while (stmt.step()) {
-      const row = stmt.getAsObject();
-      console.log(`   ${rank}. ${row.name} - ${formatTimeWithTotal(row.time)}`);
-      rank++;
+      scores.push(stmt.getAsObject());
     }
+    
+    let rank = 1;
+    scores.forEach(row => {
+      const nameKey = row.name.toLowerCase();
+      if (!nameDeviceCounts[nameKey]) {
+        nameDeviceCounts[nameKey] = { devices: [], total: 0 };
+      }
+      
+      const deviceId = row.device_id || `legacy_${Math.random()}`;
+      const deviceIndex = nameDeviceCounts[nameKey].devices.indexOf(deviceId);
+      
+      if (deviceIndex === -1) {
+        nameDeviceCounts[nameKey].devices.push(deviceId);
+        nameDeviceCounts[nameKey].total++;
+      }
+      
+      const deviceCount = nameDeviceCounts[nameKey].devices.indexOf(deviceId) + 1;
+      const displayName = nameDeviceCounts[nameKey].total > 1 
+        ? `${row.name} (${deviceCount})`
+        : row.name;
+      
+      console.log(`   ${rank}. ${displayName} - ${formatTimeWithTotal(row.time)}`);
+      rank++;
+    });
+    
     stmt.free();
     db2.close();
     

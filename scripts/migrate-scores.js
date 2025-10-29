@@ -98,19 +98,44 @@ async function viewScores(db) {
   
   // Regular scores
   const regularStmt = db.prepare(
-    'SELECT id, name, time, difficulty, date FROM leaderboard WHERE is_daily = 0 ORDER BY difficulty, time ASC'
+    'SELECT id, name, time, difficulty, date, device_id FROM leaderboard WHERE is_daily = 0 ORDER BY difficulty, time ASC'
   );
   
   console.log('🎮 REGULAR GAME SCORES:');
-  console.log('─'.repeat(70));
+  console.log('─'.repeat(90));
   let hasRegular = false;
   
+  // Track device counts
+  const regularNameCounts = {};
+  const regularScores = [];
   while (regularStmt.step()) {
-    hasRegular = true;
-    const row = regularStmt.getAsObject();
-    const date = new Date(row.date).toLocaleDateString();
-    console.log(`  [ID:${row.id}] ${row.name} - ${formatTime(row.time)} (${row.difficulty}) - ${date}`);
+    regularScores.push(regularStmt.getAsObject());
   }
+  
+  regularScores.forEach(row => {
+    hasRegular = true;
+    const nameKey = row.name.toLowerCase();
+    
+    if (!regularNameCounts[nameKey]) {
+      regularNameCounts[nameKey] = { devices: [], total: 0 };
+    }
+    
+    const deviceId = row.device_id || `legacy_${row.id}`;
+    if (regularNameCounts[nameKey].devices.indexOf(deviceId) === -1) {
+      regularNameCounts[nameKey].devices.push(deviceId);
+      regularNameCounts[nameKey].total++;
+    }
+    
+    const deviceCount = regularNameCounts[nameKey].devices.indexOf(deviceId) + 1;
+    const displayName = regularNameCounts[nameKey].total > 1 
+      ? `${row.name} (${deviceCount})`
+      : row.name;
+    
+    const date = new Date(row.date).toLocaleDateString();
+    const deviceInfo = row.device_id ? row.device_id.substring(0, 20) + '...' : '(legacy)';
+    console.log(`  [ID:${row.id}] ${displayName.padEnd(20)} ${formatTime(row.time).padEnd(10)} ${row.difficulty.padEnd(8)} ${date.padEnd(12)} ${deviceInfo}`);
+  });
+  
   regularStmt.free();
   
   if (!hasRegular) {
@@ -121,19 +146,44 @@ async function viewScores(db) {
   
   // Daily scores
   const dailyStmt = db.prepare(
-    'SELECT id, name, time, difficulty, date FROM leaderboard WHERE is_daily = 1 ORDER BY difficulty, time ASC'
+    'SELECT id, name, time, difficulty, date, device_id FROM leaderboard WHERE is_daily = 1 ORDER BY difficulty, time ASC'
   );
   
   console.log('📅 DAILY PUZZLE SCORES:');
-  console.log('─'.repeat(70));
+  console.log('─'.repeat(90));
   let hasDaily = false;
   
+  // Track device counts
+  const dailyNameCounts = {};
+  const dailyScores = [];
   while (dailyStmt.step()) {
-    hasDaily = true;
-    const row = dailyStmt.getAsObject();
-    const date = new Date(row.date).toLocaleDateString();
-    console.log(`  [ID:${row.id}] ${row.name} - ${formatTime(row.time)} (${row.difficulty}) - ${date}`);
+    dailyScores.push(dailyStmt.getAsObject());
   }
+  
+  dailyScores.forEach(row => {
+    hasDaily = true;
+    const nameKey = row.name.toLowerCase();
+    
+    if (!dailyNameCounts[nameKey]) {
+      dailyNameCounts[nameKey] = { devices: [], total: 0 };
+    }
+    
+    const deviceId = row.device_id || `legacy_${row.id}`;
+    if (dailyNameCounts[nameKey].devices.indexOf(deviceId) === -1) {
+      dailyNameCounts[nameKey].devices.push(deviceId);
+      dailyNameCounts[nameKey].total++;
+    }
+    
+    const deviceCount = dailyNameCounts[nameKey].devices.indexOf(deviceId) + 1;
+    const displayName = dailyNameCounts[nameKey].total > 1 
+      ? `${row.name} (${deviceCount})`
+      : row.name;
+    
+    const date = new Date(row.date).toLocaleDateString();
+    const deviceInfo = row.device_id ? row.device_id.substring(0, 20) + '...' : '(legacy)';
+    console.log(`  [ID:${row.id}] ${displayName.padEnd(20)} ${formatTime(row.time).padEnd(10)} ${row.difficulty.padEnd(8)} ${date.padEnd(12)} ${deviceInfo}`);
+  });
+  
   dailyStmt.free();
   
   if (!hasDaily) {
@@ -149,7 +199,7 @@ async function migrateScores(db, fromType, toType) {
   
   // Get scores to migrate
   const stmt = db.prepare(
-    'SELECT id, name, time, difficulty, date FROM leaderboard WHERE is_daily = ? ORDER BY date DESC'
+    'SELECT id, name, time, difficulty, date, device_id FROM leaderboard WHERE is_daily = ? ORDER BY date DESC'
   );
   stmt.bind([fromType]);
   
@@ -167,7 +217,8 @@ async function migrateScores(db, fromType, toType) {
   console.log(`Found ${scores.length} ${fromLabel} score(s):\n`);
   scores.forEach((score, index) => {
     const date = new Date(score.date).toLocaleDateString();
-    console.log(`  ${index + 1}) [ID:${score.id}] ${score.name} - ${formatTime(score.time)} (${score.difficulty}) - ${date}`);
+    const deviceInfo = score.device_id ? ` [${score.device_id.substring(0, 15)}...]` : ' [legacy]';
+    console.log(`  ${index + 1}) [ID:${score.id}] ${score.name}${deviceInfo} - ${formatTime(score.time)} (${score.difficulty}) - ${date}`);
   });
   
   console.log('\nOptions:');
@@ -246,7 +297,7 @@ async function migrateById(db) {
     return;
   }
   
-  const stmt = db.prepare('SELECT id, name, time, difficulty, date, is_daily FROM leaderboard WHERE id = ?');
+  const stmt = db.prepare('SELECT id, name, time, difficulty, date, is_daily, device_id FROM leaderboard WHERE id = ?');
   stmt.bind([scoreId]);
   
   if (!stmt.step()) {
@@ -261,12 +312,14 @@ async function migrateById(db) {
   const date = new Date(score.date).toLocaleDateString();
   const currentType = score.is_daily === 1 ? 'Daily' : 'Regular';
   const newType = score.is_daily === 1 ? 'Regular' : 'Daily';
+  const deviceInfo = score.device_id || '(legacy score)';
   
   console.log(`\nScore Details:`);
   console.log(`  Name: ${score.name}`);
   console.log(`  Time: ${formatTime(score.time)}`);
   console.log(`  Difficulty: ${score.difficulty}`);
   console.log(`  Date: ${date}`);
+  console.log(`  Device ID: ${deviceInfo}`);
   console.log(`  Current Type: ${currentType}`);
   console.log(`  Will become: ${newType}\n`);
   
@@ -289,7 +342,7 @@ async function migrateByNameAndDate(db) {
   const name = await question('Enter player name (or partial name): ');
   const dateInput = await question('Enter date (YYYY-MM-DD) or leave empty for all dates: ');
   
-  let query = 'SELECT id, name, time, difficulty, date, is_daily FROM leaderboard WHERE name LIKE ?';
+  let query = 'SELECT id, name, time, difficulty, date, is_daily, device_id FROM leaderboard WHERE name LIKE ?';
   let params = [`%${name}%`];
   
   if (dateInput.trim()) {
@@ -317,7 +370,8 @@ async function migrateByNameAndDate(db) {
   scores.forEach((score, index) => {
     const date = new Date(score.date).toLocaleDateString();
     const type = score.is_daily === 1 ? '📅 Daily' : '🎮 Regular';
-    console.log(`  ${index + 1}) [ID:${score.id}] ${score.name} - ${formatTime(score.time)} (${score.difficulty}) - ${date} - ${type}`);
+    const deviceInfo = score.device_id ? ` [${score.device_id.substring(0, 15)}...]` : ' [legacy]';
+    console.log(`  ${index + 1}) [ID:${score.id}] ${score.name}${deviceInfo} - ${formatTime(score.time)} (${score.difficulty}) - ${date} - ${type}`);
   });
   
   console.log('\nEnter score numbers to toggle their type (e.g., "1,3,5" or "all"):');

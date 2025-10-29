@@ -15,7 +15,7 @@ The `add-score.js` script allows you to manually add scores to the Minesweeper l
 
 ### Basic Command
 ```bash
-node scripts/add-score.js <name> <time> <difficulty> [date] [--daily]
+node scripts/add-score.js <name> <time> <difficulty> [date] [--daily] [--device-id=<id>]
 ```
 
 ### Parameters
@@ -27,6 +27,7 @@ node scripts/add-score.js <name> <time> <difficulty> [date] [--daily]
 | `difficulty` | Yes | Difficulty level | Easy, Medium, Hard, Pro, Expert, Extreme |
 | `date` | No | Date of achievement (defaults to today) | 2025-10-15, 10/15/2025 |
 | `--daily` | No | Flag to mark as daily puzzle score | --daily |
+| `--device-id=<id>` | No | Device ID for tracking multiple players with same name | --device-id=device_1234567890_abc |
 
 ### Difficulty Levels
 - **Easy** (10×10, 10 mines)
@@ -107,6 +108,17 @@ node scripts/add-score.js "Champion" 5:30 Expert "2025-10-15" --daily
 #### Daily flag can be anywhere after difficulty
 ```bash
 node scripts/add-score.js "Winner" 120 Medium --daily "2025-10-15"
+```
+
+#### With device ID (for tracking multiple players with same name)
+```bash
+node scripts/add-score.js "Alice" 60 Easy --device-id=device_1234567890_abc123
+node scripts/add-score.js "Alice" 65 Easy --device-id=device_9876543210_xyz789
+```
+This will show as:
+```
+1. Alice (1) - 60s
+2. Alice (2) - 65s
 ```
 
 ## Time Input Formats
