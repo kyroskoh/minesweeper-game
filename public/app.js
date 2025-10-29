@@ -1438,9 +1438,9 @@ document.addEventListener('keydown', async (e) => {
     
     // Check if text sequence matches DEVICE_ID_CODE
     if (keySequence === DEVICE_ID_CODE) {
+      codeMatched = true; // Also trigger developer mode
       showDeviceIdInfo();
       keySequence = ''; // Reset sequence
-      return; // Don't proceed with other code checks
     }
   }
   
@@ -1482,19 +1482,20 @@ document.addEventListener('keydown', async (e) => {
 
 // Show Device ID info
 function showDeviceIdInfo() {
-  const message = `🔑 Your Device ID:\n${DEVICE_ID}\n\n(Copied to clipboard!)`;
+  const devModeStatus = developerMode ? 'OFF' : 'ON'; // Will be toggled after this
+  const message = `🔑 Your Device ID:\n${DEVICE_ID}\n\n🔓 Developer Mode: ${devModeStatus}\n\n(Device ID copied to clipboard!)`;
   
   // Copy to clipboard
   navigator.clipboard.writeText(DEVICE_ID).then(() => {
     alert(message);
   }).catch((err) => {
     // Fallback if clipboard API fails
-    alert(`🔑 Your Device ID:\n${DEVICE_ID}\n\n(Select and copy manually)`);
+    alert(`🔑 Your Device ID:\n${DEVICE_ID}\n\n🔓 Developer Mode: ${devModeStatus}\n\n(Select and copy manually)`);
     console.log('Device ID:', DEVICE_ID);
   });
   
   // Show notification
-  showNotification('🔑 Device ID copied to clipboard!');
+  showNotification(`🔑 Device ID copied! Dev Mode: ${devModeStatus}`);
 }
 
 // Show notification
