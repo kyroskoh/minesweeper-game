@@ -10,7 +10,6 @@ let timerInterval = null;
 let localStartTime = null;
 let developerMode = false; // Master developer mode (Konami code)
 let showMinesMode = false; // Toggle for showing mines (showmines code)
-let showDeviceIdMode = false; // Toggle for showing device ID (showid code)
 let keySequence = '';
 let arrowSequence = [];
 let minePositions = null;
@@ -1748,28 +1747,24 @@ async function toggleShowMines() {
   showNotification(message);
 }
 
-// Toggle show device ID mode
+// Show device ID (always shows, no toggle)
 function toggleShowDeviceId() {
-  showDeviceIdMode = !showDeviceIdMode;
-  console.log(`🔑 Show Device ID Mode: ${showDeviceIdMode ? 'ON' : 'OFF'}`);
+  console.log(`🔑 Showing Device ID: ${DEVICE_ID}`);
   
-  if (showDeviceIdMode) {
-    // Show device ID
-    const message = `🔑 Device ID Display: ON\n\nYour Device ID:\n${DEVICE_ID}\n\n(Copied to clipboard!)`;
-    
-    // Copy to clipboard
-    navigator.clipboard.writeText(DEVICE_ID).then(() => {
-      alert(message);
-    }).catch((err) => {
-      // Fallback if clipboard API fails
-      alert(`🔑 Device ID Display: ON\n\nYour Device ID:\n${DEVICE_ID}\n\n(Select and copy manually)`);
-      console.log('Device ID:', DEVICE_ID);
-    });
-  } else {
-    // Hide device ID
-    const message = '🔒 Device ID Display: OFF';
-    showNotification(message);
-  }
+  // Always show device ID when called
+  const message = `🔑 Your Device ID:\n${DEVICE_ID}\n\n(Copied to clipboard!)`;
+  
+  // Copy to clipboard
+  navigator.clipboard.writeText(DEVICE_ID).then(() => {
+    alert(message);
+  }).catch((err) => {
+    // Fallback if clipboard API fails
+    alert(`🔑 Your Device ID:\n${DEVICE_ID}\n\n(Select and copy manually)`);
+    console.log('Device ID:', DEVICE_ID);
+  });
+  
+  // Show notification
+  showNotification('🔑 Device ID copied!');
 }
 
 // Toggle master developer mode (Konami code)
