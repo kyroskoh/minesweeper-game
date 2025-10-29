@@ -1701,13 +1701,37 @@ h1 {
 
 .footer-author strong {
   font-weight: 600;
+  color: #333;
+}
+
+.footer-author a {
   color: #007bff;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.footer-author a:hover {
+  color: #0056b3;
+  text-decoration: underline;
 }
 
 .footer-copyright {
   font-size: 0.9em;
   color: #666;
   margin: 0;
+}
+
+.footer-copyright a {
+  color: #007bff;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.footer-copyright a:hover {
+  color: #0056b3;
+  text-decoration: underline;
 }
 
 /* Responsive footer styles */
