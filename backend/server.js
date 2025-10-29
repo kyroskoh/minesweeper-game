@@ -680,58 +680,31 @@ app.post('/api/leaderboard', async (req, res) => {
   }
 });
 
-app.get('/api/leaderboard/:difficulty', async (req, res) => {
-  const { difficulty } = req.params;
-  
-  try {
-    // Reload database from disk to get latest data
-    await reloadDatabase();
-    
-    const stmt = db.prepare(
-      'SELECT name, time, difficulty, date, is_daily, device_id FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
-    );
-    stmt.bind([difficulty]);
-    
-    const scores = [];
-    while (stmt.step()) {
-      scores.push(stmt.getAsObject());
-    }
-    stmt.free();
-    
-    res.json({ leaderboard: scores });
-  } catch (error) {
-    console.error('Error fetching leaderboard:', error);
-    res.status(500).json({ error: 'Failed to fetch leaderboard' });
-  }
-});
+// ⚠️ IMPORTANT: Specific routes MUST come before parameterized routes!
+// Otherwise Express will match /api/leaderboard/daily-dates to /:difficulty
 
-app.get('/api/leaderboard', async (req, res) => {
-  const byDifficulty = {};
-  
+// API endpoint to list available historical dates (MUST be before /:difficulty)
+app.get('/api/leaderboard/daily-dates', (req, res) => {
   try {
-    // Reload database from disk to get latest data
-    await reloadDatabase();
+    const files = fs.readdirSync(historicalDbDir);
+    const dates = files
+      .filter(f => f.startsWith('historical_daily_leaderboard_') && f.endsWith('.db'))
+      .map(f => {
+        const dateStr = f.replace('historical_daily_leaderboard_', '').replace('.db', '');
+        const year = dateStr.substring(0, 4);
+        const month = dateStr.substring(4, 6);
+        const day = dateStr.substring(6, 8);
+        return {
+          dateKey: dateStr,
+          displayDate: `${year}-${month}-${day}`
+        };
+      })
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey)); // Most recent first
     
-    Object.keys(difficultyNames).forEach(key => {
-      const diffName = difficultyNames[key];
-      const stmt = db.prepare(
-        'SELECT name, time, difficulty, date, is_daily, device_id FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
-      );
-      stmt.bind([diffName]);
-      
-      const scores = [];
-      while (stmt.step()) {
-        scores.push(stmt.getAsObject());
-      }
-      stmt.free();
-      
-      byDifficulty[diffName] = scores;
-    });
-
-    res.json({ leaderboard: byDifficulty });
+    res.json({ dates });
   } catch (error) {
-    console.error('Error fetching leaderboard:', error);
-    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+    console.error('Error listing historical dates:', error);
+    res.json({ dates: [] });
   }
 });
 
@@ -777,28 +750,60 @@ app.get('/api/leaderboard/daily-history/:date', async (req, res) => {
   }
 });
 
-// API endpoint to list available historical dates
-app.get('/api/leaderboard/daily-dates', (req, res) => {
+// Get all leaderboards grouped by difficulty
+app.get('/api/leaderboard', async (req, res) => {
+  const byDifficulty = {};
+  
   try {
-    const files = fs.readdirSync(historicalDbDir);
-    const dates = files
-      .filter(f => f.startsWith('historical_daily_leaderboard_') && f.endsWith('.db'))
-      .map(f => {
-        const dateStr = f.replace('historical_daily_leaderboard_', '').replace('.db', '');
-        const year = dateStr.substring(0, 4);
-        const month = dateStr.substring(4, 6);
-        const day = dateStr.substring(6, 8);
-        return {
-          dateKey: dateStr,
-          displayDate: `${year}-${month}-${day}`
-        };
-      })
-      .sort((a, b) => b.dateKey.localeCompare(a.dateKey)); // Most recent first
+    // Reload database from disk to get latest data
+    await reloadDatabase();
     
-    res.json({ dates });
+    Object.keys(difficultyNames).forEach(key => {
+      const diffName = difficultyNames[key];
+      const stmt = db.prepare(
+        'SELECT name, time, difficulty, date, is_daily, device_id FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
+      );
+      stmt.bind([diffName]);
+      
+      const scores = [];
+      while (stmt.step()) {
+        scores.push(stmt.getAsObject());
+      }
+      stmt.free();
+      
+      byDifficulty[diffName] = scores;
+    });
+
+    res.json({ leaderboard: byDifficulty });
   } catch (error) {
-    console.error('Error listing historical dates:', error);
-    res.json({ dates: [] });
+    console.error('Error fetching leaderboard:', error);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
+// Get leaderboard for a specific difficulty (MUST be last - catches all unmatched routes)
+app.get('/api/leaderboard/:difficulty', async (req, res) => {
+  const { difficulty } = req.params;
+  
+  try {
+    // Reload database from disk to get latest data
+    await reloadDatabase();
+    
+    const stmt = db.prepare(
+      'SELECT name, time, difficulty, date, is_daily, device_id FROM leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
+    );
+    stmt.bind([difficulty]);
+    
+    const scores = [];
+    while (stmt.step()) {
+      scores.push(stmt.getAsObject());
+    }
+    stmt.free();
+    
+    res.json({ leaderboard: scores });
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
   }
 });
 
