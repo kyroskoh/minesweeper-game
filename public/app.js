@@ -713,6 +713,69 @@ document.querySelectorAll('.diff-btn').forEach(btn => {
 // New game button
 newGameBtn.addEventListener('click', startNewGame);
 
+// Calculate time until next daily puzzle (midnight SGT)
+function getNextDailyPuzzleTime() {
+  const now = new Date();
+  
+  // Get current time in SGT
+  const sgtTimeStr = now.toLocaleString('en-US', { timeZone: 'Asia/Singapore' });
+  const sgtNow = new Date(sgtTimeStr);
+  
+  // Get next midnight SGT
+  const nextMidnightSGT = new Date(sgtNow);
+  nextMidnightSGT.setHours(24, 0, 0, 0);
+  
+  // Convert back to local time
+  const sgtMidnightStr = nextMidnightSGT.toLocaleString('en-US', { timeZone: 'Asia/Singapore' });
+  const nextMidnight = new Date(sgtMidnightStr);
+  
+  return nextMidnight;
+}
+
+function updateDailyCountdown() {
+  const countdownElement = document.getElementById('dailyCountdown');
+  if (!countdownElement) return;
+  
+  const now = new Date();
+  const nextPuzzle = getNextDailyPuzzleTime();
+  const diff = nextPuzzle - now;
+  
+  if (diff <= 0) {
+    countdownElement.textContent = '⏰ New puzzle available now! Refresh the page.';
+    return;
+  }
+  
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  
+  // Get user's local time for next puzzle
+  const localTimeStr = nextPuzzle.toLocaleTimeString('en-US', { 
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true 
+  });
+  
+  const localDateStr = nextPuzzle.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric'
+  });
+  
+  // Check if user is in SGT timezone
+  const userOffset = -now.getTimezoneOffset() / 60;
+  const isInSGT = userOffset === 8;
+  
+  if (isInSGT) {
+    countdownElement.textContent = `⏰ Next puzzle in ${hours}h ${minutes}m ${seconds}s`;
+    countdownElement.classList.remove('local-time');
+  } else {
+    countdownElement.textContent = `⏰ Next puzzle in ${hours}h ${minutes}m ${seconds}s (${localTimeStr} your time on ${localDateStr})`;
+    countdownElement.classList.add('local-time');
+  }
+}
+
+let countdownInterval = null;
+
 // Daily puzzle modal functions
 function showDailyPuzzleModal() {
   // Update date displays (using Singapore Time)
@@ -730,11 +793,26 @@ function showDailyPuzzleModal() {
     modalDate.textContent = dateStr;
   }
   
+  // Update countdown immediately
+  updateDailyCountdown();
+  
+  // Update countdown every second
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+  }
+  countdownInterval = setInterval(updateDailyCountdown, 1000);
+  
   dailyPuzzleModal.classList.add('show');
 }
 
 function hideDailyPuzzleModal() {
   dailyPuzzleModal.classList.remove('show');
+  
+  // Stop countdown timer
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
 }
 
 dailyPuzzleBtn.addEventListener('click', showDailyPuzzleModal);
@@ -744,6 +822,9 @@ closeDailyModal.addEventListener('click', hideDailyPuzzleModal);
 window.addEventListener('click', (e) => {
   if (e.target === dailyPuzzleModal) {
     hideDailyPuzzleModal();
+  }
+  if (e.target === leaderboardModal) {
+    hideLeaderboard();
   }
 });
 
