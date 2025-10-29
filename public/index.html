@@ -157,6 +157,15 @@
     </div>
   </div>
 
+  <!-- Day.js - lightweight date library (2KB) -->
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/utc.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/timezone.min.js"></script>
+  <script>
+    // Initialize Day.js plugins
+    dayjs.extend(window.dayjs_plugin_utc);
+    dayjs.extend(window.dayjs_plugin_timezone);
+  </script>
   <script src="app.js"></script>
 </body>
 </html>

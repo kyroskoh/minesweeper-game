@@ -716,45 +716,56 @@ newGameBtn.addEventListener('click', startNewGame);
 // Calculate time until next daily puzzle (midnight SGT)
 function getNextDailyPuzzleTime() {
   try {
-    const now = new Date();
-    
-    // Method 1: Try using toLocaleString with timezone (may fail on some mobile browsers)
-    try {
-      const sgtTimeStr = now.toLocaleString('en-US', { timeZone: 'Asia/Singapore' });
-      const sgtNow = new Date(sgtTimeStr);
-      
-      // Get next midnight SGT
-      const nextMidnightSGT = new Date(sgtNow);
-      nextMidnightSGT.setHours(24, 0, 0, 0);
-      
-      // Calculate the difference
-      const diffMs = nextMidnightSGT - sgtNow;
-      
-      // Add this difference to current time to get local equivalent
-      const nextMidnight = new Date(now.getTime() + diffMs);
-      
-      return nextMidnight;
-    } catch (e) {
-      // Fallback: Manual calculation
-      console.warn('Timezone conversion failed, using manual calculation:', e);
-      
-      // Calculate SGT offset manually (UTC+8)
-      const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-      const sgtTime = new Date(utcTime + (8 * 60 * 60000)); // Add 8 hours
-      
-      // Get next midnight SGT
-      const nextMidnightSGT = new Date(sgtTime);
-      nextMidnightSGT.setUTCHours(24, 0, 0, 0);
-      
-      // Calculate how many ms until midnight SGT
-      const msUntilMidnight = nextMidnightSGT - sgtTime;
-      
-      // Add to current local time
-      return new Date(now.getTime() + msUntilMidnight);
+    // Check if dayjs is available
+    if (typeof dayjs === 'undefined') {
+      console.warn('Day.js not loaded, using fallback calculation');
+      return getNextDailyPuzzleTimeFallback();
     }
+    
+    // Get current time in Singapore timezone
+    const nowSGT = dayjs().tz('Asia/Singapore');
+    
+    // Get next midnight SGT (start of next day)
+    const nextMidnightSGT = nowSGT.add(1, 'day').startOf('day');
+    
+    // Return as JavaScript Date object
+    return nextMidnightSGT.toDate();
+    
   } catch (error) {
     console.error('Error calculating next daily puzzle time:', error);
-    // Return 24 hours from now as ultimate fallback
+    return getNextDailyPuzzleTimeFallback();
+  }
+}
+
+// Fallback calculation without Day.js
+function getNextDailyPuzzleTimeFallback() {
+  try {
+    const now = new Date();
+    
+    // Calculate UTC timestamp
+    const utcTimestamp = now.getTime() + (now.getTimezoneOffset() * 60000);
+    
+    // Add 8 hours for SGT (UTC+8)
+    const sgtTimestamp = utcTimestamp + (8 * 60 * 60000);
+    const sgtDate = new Date(sgtTimestamp);
+    
+    // Get current SGT date components
+    const sgtYear = sgtDate.getUTCFullYear();
+    const sgtMonth = sgtDate.getUTCMonth();
+    const sgtDay = sgtDate.getUTCDate();
+    
+    // Create next midnight SGT
+    const nextMidnightSGT = new Date(Date.UTC(sgtYear, sgtMonth, sgtDay + 1, 0, 0, 0, 0));
+    
+    // Convert back to local time
+    // Subtract 8 hours from SGT to get UTC, then adjust to local
+    const nextMidnightUTC = nextMidnightSGT.getTime() - (8 * 60 * 60000);
+    const nextMidnightLocal = new Date(nextMidnightUTC);
+    
+    return nextMidnightLocal;
+  } catch (error) {
+    console.error('Fallback calculation failed:', error);
+    // Ultimate fallback: 24 hours from now
     return new Date(Date.now() + 24 * 60 * 60 * 1000);
   }
 }
@@ -779,28 +790,34 @@ function updateDailyCountdown() {
     const seconds = Math.floor((diff % (1000 * 60)) / 1000);
     
     // Validate calculated time
-    if (hours < 0 || hours > 24 || isNaN(hours)) {
-      console.warn('Invalid countdown calculation:', { hours, minutes, seconds, diff });
+    if (hours < 0 || hours > 25 || isNaN(hours)) {
+      console.warn('Invalid countdown calculation:', { hours, minutes, seconds, diff, nextPuzzle, now });
       countdownElement.textContent = '⏰ Next puzzle at midnight SGT';
       countdownElement.style.display = 'inline-block';
       return;
     }
     
-    // Try to get user's local time for next puzzle
+    // Format local time using Day.js if available, otherwise fallback
     let localTimeStr = '';
     let localDateStr = '';
     
     try {
-      localTimeStr = nextPuzzle.toLocaleTimeString('en-US', { 
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true 
-      });
-      
-      localDateStr = nextPuzzle.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      });
+      if (typeof dayjs !== 'undefined') {
+        const localTime = dayjs(nextPuzzle);
+        localTimeStr = localTime.format('h:mm A');
+        localDateStr = localTime.format('MMM D');
+      } else {
+        // Fallback to native formatting
+        localTimeStr = nextPuzzle.toLocaleTimeString('en-US', { 
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true 
+        });
+        localDateStr = nextPuzzle.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric'
+        });
+      }
     } catch (e) {
       console.warn('Could not format local time:', e);
       // Will show simplified version without local time
@@ -835,14 +852,32 @@ let countdownInterval = null;
 // Daily puzzle modal functions
 function showDailyPuzzleModal() {
   // Update date displays (using Singapore Time)
-  const today = new Date();
-  const dateStr = today.toLocaleDateString('en-US', { 
-    weekday: 'long',
-    month: 'long', 
-    day: 'numeric', 
-    year: 'numeric',
-    timeZone: 'Asia/Singapore'
-  });
+  let dateStr;
+  
+  try {
+    if (typeof dayjs !== 'undefined') {
+      // Use Day.js for reliable timezone handling
+      dateStr = dayjs().tz('Asia/Singapore').format('dddd, MMMM D, YYYY');
+    } else {
+      // Fallback to native methods
+      const today = new Date();
+      dateStr = today.toLocaleDateString('en-US', { 
+        weekday: 'long',
+        month: 'long', 
+        day: 'numeric', 
+        year: 'numeric',
+        timeZone: 'Asia/Singapore'
+      });
+    }
+  } catch (e) {
+    console.warn('Could not format date:', e);
+    dateStr = new Date().toLocaleDateString('en-US', { 
+      weekday: 'long',
+      month: 'long', 
+      day: 'numeric', 
+      year: 'numeric'
+    });
+  }
   
   const modalDate = document.getElementById('dailyModalDate');
   if (modalDate) {
