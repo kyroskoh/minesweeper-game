@@ -27,7 +27,11 @@ The `add-score.js` script allows you to manually add scores to the Minesweeper l
 
 ### Basic Command
 ```bash
-node scripts/add-score.js <name> <time> <difficulty> [date] [--daily] [--device-id=<id>]
+# Direct usage
+node scripts/add-score.js <name> <time> <difficulty> [date] [--daily] [--device-id=<id>] [--overwrite]
+
+# Via npm (note the -- before flags)
+npm run add-score -- <name> <time> <difficulty> [date] [--daily] [--device-id=<id>] [--overwrite]
 ```
 
 ### Parameters
@@ -39,7 +43,20 @@ node scripts/add-score.js <name> <time> <difficulty> [date] [--daily] [--device-
 | `difficulty` | Yes | Difficulty level | Easy, Medium, Hard, Pro, Expert, Extreme |
 | `date` | No | Date of achievement (defaults to today) | 2025-10-15, 10/15/2025 |
 | `--daily` | No | Flag to mark as daily puzzle score | --daily |
-| `--device-id=<id>` | No | Device ID for tracking multiple players with same name | --device-id=device_1234567890_abc |
+| `--device-id=<id>` | No | Device ID for tracking multiple players with same name | --device-id=device_123 |
+| `--overwrite` | No | Update existing score instead of creating duplicate | --overwrite |
+
+### Important: Using npm run
+
+When using `npm run add-score`, you **must** include `--` before any flags:
+
+```bash
+# ✅ Correct
+npm run add-score -- "Player" 90 Easy --daily
+
+# ❌ Wrong (flags will be ignored)
+npm run add-score "Player" 90 Easy --daily
+```
 
 ### Difficulty Levels
 - **Easy** (10×10, 10 mines)
@@ -56,6 +73,9 @@ node scripts/add-score.js <name> <time> <difficulty> [date] [--daily] [--device-
 #### Basic usage (defaults to today's date)
 ```bash
 node scripts/add-score.js "John Doe" 45 Easy
+
+# Or via npm
+npm run add-score -- "John Doe" 45 Easy
 ```
 Output:
 ```
@@ -65,7 +85,8 @@ Output:
    Difficulty: Easy
    Type: 🎮 Regular Game
    Date: 10/28/2025
-✅ Score added successfully!
+   Device ID: (none - legacy score)
+✅ Score added to main leaderboard!
 ```
 
 #### Using mm:ss format
@@ -95,6 +116,9 @@ node scripts/add-score.js "Speed Runner" 90 Pro "10/15/2025"
 #### Add today's daily puzzle score
 ```bash
 node scripts/add-score.js "Daily Winner" 90 Pro --daily
+
+# Or via npm (note the --)
+npm run add-score -- "Daily Winner" 90 Pro --daily
 ```
 Output:
 ```
@@ -104,7 +128,9 @@ Output:
    Difficulty: Pro
    Type: 📅 Daily Puzzle
    Date: 10/28/2025
-✅ Score added successfully!
+   Device ID: (none - legacy score)
+✅ Score added to main leaderboard!
+✅ Score archived to historical database: historical_daily_leaderboard_20251028.db
 
 🏆 Top 5 - Pro (📅 Daily Puzzle):
    1. Speed Runner - 01m15s (75s)
@@ -115,23 +141,83 @@ Output:
 #### Add past daily puzzle score with date
 ```bash
 node scripts/add-score.js "Champion" 5:30 Expert "2025-10-15" --daily
+
+# Or via npm
+npm run add-score -- "Champion" 5:30 Expert "2025-10-15" --daily
 ```
 
 #### Daily flag can be anywhere after difficulty
 ```bash
 node scripts/add-score.js "Winner" 120 Medium --daily "2025-10-15"
+npm run add-score -- "Winner" 120 Medium "2025-10-15" --daily
 ```
 
 #### With device ID (for tracking multiple players with same name)
 ```bash
 node scripts/add-score.js "Alice" 60 Easy --device-id=device_1234567890_abc123
 node scripts/add-score.js "Alice" 65 Easy --device-id=device_9876543210_xyz789
+
+# Or via npm (note the --)
+npm run add-score -- "Alice" 60 Easy --device-id=device_1234567890_abc123
+npm run add-score -- "Alice" 65 Easy --device-id=device_9876543210_xyz789
 ```
 This will show as:
 ```
 1. Alice (1) - 60s
 2. Alice (2) - 65s
 ```
+
+#### With device ID and daily flag together
+```bash
+node scripts/add-score.js "Wilnice" 9 Easy "2025-10-29" --daily --device-id=device_1761756531027_hzjbe5ijh
+
+# Or via npm (IMPORTANT: use -- before flags!)
+npm run add-score -- "Wilnice" 9 Easy "2025-10-29" --daily --device-id=device_1761756531027_hzjbe5ijh
+```
+Output:
+```
+📝 Adding score to leaderboard...
+   Name: Wilnice
+   Time: 09s (9s)
+   Difficulty: Easy
+   Type: 📅 Daily Puzzle
+   Date: 10/29/2025
+   Device ID: device_1761756531027_hzjbe5ijh
+✅ Score added to main leaderboard!
+✅ Score archived to historical database: historical_daily_leaderboard_20251029.db
+```
+
+#### Using --overwrite to update existing scores
+```bash
+# Initial score
+node scripts/add-score.js "John" 45 Easy
+
+# Update John's score for today (same name, difficulty, date, and type)
+node scripts/add-score.js "John" 40 Easy --overwrite
+
+# Or via npm
+npm run add-score -- "John" 40 Easy --overwrite
+```
+Output:
+```
+📝 Adding score to leaderboard...
+   Name: John
+   Time: 40s (40s)
+   Difficulty: Easy
+   Type: 🎮 Regular Game
+   Date: 10/29/2025
+   Device ID: (none - legacy score)
+
+🔄 Updated existing score:
+   Old time: 45s (45s)
+   New time: 40s (40s)
+   Old device ID: (none - legacy score)
+   New device ID: (none - legacy score)
+✅ Score updated in main leaderboard!
+```
+
+**Note**: --overwrite matches scores by name, difficulty, date (YYYY-MM-DD), and type (daily/regular).
+If no matching score exists, it will insert a new one.
 
 ## Time Input Formats
 
@@ -787,9 +873,25 @@ npm run sync-historical
 ## Notes About All Scripts
 
 - Scores are immediately added to the database
-- **add-score.js**: No duplicate checking (you can add the same score multiple times)
+- **add-score.js**: 
+  - By default, creates new scores without duplicate checking
+  - With `--overwrite` flag, updates existing scores matching name/difficulty/date/type
+  - Auto-archives daily scores to historical databases
 - **migrate-scores.js**: Has duplicate detection, auto-archives to historical when migrating to daily
 - **sync-historical.js**: Automatically skips duplicates, safe to run multiple times
 - The leaderboard in the game will show all scores in the database
 - Daily puzzle scores and regular scores are tracked separately
 - Historical databases preserve daily puzzle scores by date (SGT timezone)
+
+## --overwrite Flag Behavior
+
+The `--overwrite` flag in `add-score.js` matches scores based on:
+- Player name (exact match, case-sensitive)
+- Difficulty (exact match)
+- Date (YYYY-MM-DD format, ignoring time)
+- Type (daily puzzle vs regular game)
+
+**Examples:**
+- ✅ Will overwrite: Same name, same difficulty, same date, same type
+- ❌ Won't overwrite: Different name, or different difficulty, or different date, or different type
+- If no match found, a new score is inserted instead

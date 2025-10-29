@@ -11,7 +11,7 @@ async function addScore() {
   const args = process.argv.slice(2);
   
   if (args.length < 3) {
-    console.error('\n❌ Usage: node scripts/add-score.js <name> <time> <difficulty> [date] [--daily] [--device-id=<id>]');
+    console.error('\n❌ Usage: node scripts/add-score.js <name> <time> <difficulty> [date] [--daily] [--device-id=<id>] [--overwrite]');
     console.log('\nExamples:');
     console.log('  node scripts/add-score.js "John Doe" 45 Easy');
     console.log('  node scripts/add-score.js "Jane Smith" 120 Medium');
@@ -20,11 +20,13 @@ async function addScore() {
     console.log('  node scripts/add-score.js "Daily Winner" 90 Pro --daily');
     console.log('  node scripts/add-score.js "Champion" 5:30 Extreme "2025-10-15" --daily');
     console.log('  node scripts/add-score.js "Alice" 60 Easy --device-id=device_1234567890_abc123');
+    console.log('  node scripts/add-score.js "John Doe" 40 Easy --overwrite  # Update existing score');
     console.log('\nValid difficulties: Easy, Medium, Hard, Pro, Expert, Extreme');
     console.log('Time can be in seconds (e.g., 45) or mm:ss format (e.g., 3:45)');
     console.log('Date is optional (defaults to today). Formats: YYYY-MM-DD, MM/DD/YYYY, or any valid date string');
     console.log('Use --daily flag to mark this as a daily puzzle score');
     console.log('Use --device-id=<id> to specify a device ID (optional)');
+    console.log('Use --overwrite flag to update existing score instead of creating duplicate');
     process.exit(1);
   }
 
@@ -36,13 +38,37 @@ async function addScore() {
   const dailyFlagIndex = args.slice(3).findIndex(arg => arg === '--daily');
   const isDailyPuzzle = dailyFlagIndex !== -1;
   
-  // Check for --device-id flag
-  const deviceIdArg = args.slice(3).find(arg => arg.startsWith('--device-id='));
-  const deviceId = deviceIdArg ? deviceIdArg.split('=')[1] : null;
+  // Check for --overwrite flag
+  const overwriteFlagIndex = args.slice(3).findIndex(arg => arg === '--overwrite');
+  const shouldOverwrite = overwriteFlagIndex !== -1;
   
-  // Get date from args, excluding --daily and --device-id flags
+  // Check for --device-id flag (support both --device-id=value and --device-id value)
+  let deviceId = null;
+  const deviceIdArgIndex = args.slice(3).findIndex(arg => arg.startsWith('--device-id'));
+  if (deviceIdArgIndex !== -1) {
+    const deviceIdArg = args[3 + deviceIdArgIndex];
+    if (deviceIdArg.includes('=')) {
+      // Format: --device-id=value
+      deviceId = deviceIdArg.split('=')[1];
+    } else if (args[3 + deviceIdArgIndex + 1] && !args[3 + deviceIdArgIndex + 1].startsWith('--')) {
+      // Format: --device-id value
+      deviceId = args[3 + deviceIdArgIndex + 1];
+    }
+  }
+  
+  // Get date from args, excluding --daily, --overwrite, and --device-id flags
   let dateInput = null;
-  const remainingArgs = args.slice(3).filter(arg => arg !== '--daily' && !arg.startsWith('--device-id='));
+  const remainingArgs = args.slice(3).filter((arg, index) => {
+    // Skip --daily flag
+    if (arg === '--daily') return false;
+    // Skip --overwrite flag
+    if (arg === '--overwrite') return false;
+    // Skip --device-id flag and its value
+    if (arg.startsWith('--device-id')) return false;
+    // Skip value after --device-id if not using = format
+    if (index > 0 && args[3 + index - 1] === '--device-id') return false;
+    return true;
+  });
   if (remainingArgs.length > 0) {
     dateInput = remainingArgs[0].trim();
   }
@@ -198,11 +224,46 @@ async function addScore() {
     
     const db = new SQL.Database(buffer);
     
-    // Insert the score with is_daily flag and device_id
-    db.run(
-      'INSERT INTO leaderboard (name, time, difficulty, date, is_daily, device_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, timeInSeconds, difficulty, date, isDailyPuzzle ? 1 : 0, deviceId]
-    );
+    // Normalize the date to YYYY-MM-DD format for comparison
+    const dateObj = new Date(date);
+    const normalizedDate = dateObj.toISOString().split('T')[0];
+    
+    // Check if score already exists (match by name, difficulty, date, and is_daily)
+    let existingScore = null;
+    if (shouldOverwrite) {
+      const stmt = db.prepare(
+        `SELECT id, time, device_id FROM leaderboard 
+         WHERE name = ? AND difficulty = ? AND date LIKE ? AND is_daily = ?`
+      );
+      stmt.bind([name, difficulty, `${normalizedDate}%`, isDailyPuzzle ? 1 : 0]);
+      if (stmt.step()) {
+        existingScore = stmt.getAsObject();
+      }
+      stmt.free();
+    }
+    
+    if (existingScore) {
+      // Update existing score
+      const oldTime = existingScore.time;
+      const oldDeviceId = existingScore.device_id;
+      
+      db.run(
+        'UPDATE leaderboard SET time = ?, device_id = ? WHERE id = ?',
+        [timeInSeconds, deviceId, existingScore.id]
+      );
+      
+      console.log(`\n🔄 Updated existing score:`);
+      console.log(`   Old time: ${formatTimeWithTotal(oldTime)}`);
+      console.log(`   New time: ${formatTimeWithTotal(timeInSeconds)}`);
+      console.log(`   Old device ID: ${oldDeviceId || '(none - legacy score)'}`);
+      console.log(`   New device ID: ${deviceId || '(none - legacy score)'}`);
+    } else {
+      // Insert new score
+      db.run(
+        'INSERT INTO leaderboard (name, time, difficulty, date, is_daily, device_id) VALUES (?, ?, ?, ?, ?, ?)',
+        [name, timeInSeconds, difficulty, date, isDailyPuzzle ? 1 : 0, deviceId]
+      );
+    }
     
     // Save main database
     const data = db.export();
@@ -210,7 +271,11 @@ async function addScore() {
     fs.writeFileSync(dbPath, newBuffer);
     db.close();
     
-    console.log('✅ Score added to main leaderboard!');
+    if (existingScore) {
+      console.log('✅ Score updated in main leaderboard!');
+    } else {
+      console.log('✅ Score added to main leaderboard!');
+    }
     
     // If this is a daily puzzle score, also save to historical database
     if (isDailyPuzzle) {
@@ -258,19 +323,42 @@ async function addScore() {
           console.log('📅 Created new historical database');
         }
         
-        // Insert into historical database
-        historicalDb.run(
-          'INSERT INTO daily_leaderboard (name, time, difficulty, date, device_id) VALUES (?, ?, ?, ?, ?)',
-          [name, timeInSeconds, difficulty, date, deviceId]
-        );
+        // Check if score already exists in historical database
+        let existingHistoricalScore = null;
+        if (shouldOverwrite) {
+          const histStmt = historicalDb.prepare(
+            `SELECT id, time, device_id FROM daily_leaderboard 
+             WHERE name = ? AND difficulty = ? AND date LIKE ?`
+          );
+          histStmt.bind([name, difficulty, `${normalizedDate}%`]);
+          if (histStmt.step()) {
+            existingHistoricalScore = histStmt.getAsObject();
+          }
+          histStmt.free();
+        }
+        
+        const historicalFilename = path.basename(historicalDbPath);
+        
+        if (existingHistoricalScore) {
+          // Update existing historical score
+          historicalDb.run(
+            'UPDATE daily_leaderboard SET time = ?, device_id = ? WHERE id = ?',
+            [timeInSeconds, deviceId, existingHistoricalScore.id]
+          );
+          console.log(`🔄 Updated score in historical database: ${historicalFilename}`);
+        } else {
+          // Insert into historical database
+          historicalDb.run(
+            'INSERT INTO daily_leaderboard (name, time, difficulty, date, device_id) VALUES (?, ?, ?, ?, ?)',
+            [name, timeInSeconds, difficulty, date, deviceId]
+          );
+          console.log(`✅ Score archived to historical database: ${historicalFilename}`);
+        }
         
         // Save historical database
         const historicalData = historicalDb.export();
         const historicalNewBuffer = Buffer.from(historicalData);
         fs.writeFileSync(historicalDbPath, historicalNewBuffer);
-        
-        const historicalFilename = path.basename(historicalDbPath);
-        console.log(`✅ Score archived to historical database: ${historicalFilename}`);
         
         historicalDb.close();
       } catch (error) {
