@@ -8,15 +8,18 @@ let previousGameState = null;
 let flagsPlaced = 0;
 let timerInterval = null;
 let localStartTime = null;
-let developerMode = false;
+let developerMode = false; // Master developer mode (Konami code)
+let showMinesMode = false; // Toggle for showing mines (showmines code)
+let showDeviceIdMode = false; // Toggle for showing device ID (showid code)
 let keySequence = '';
 let arrowSequence = [];
 let minePositions = null;
 let isDailyPuzzle = false;
 let isUpdating = false; // Prevent multiple simultaneous updates
-const SECRET_CODE = 'showmines'; // Text code for showing mines
-const DEVICE_ID_CODE = 'showid'; // Text code for showing device ID
-const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']; // Konami code
+const DEV_MODE_CODE = 'showdev'; // Text code for toggling developer mode
+const SECRET_CODE = 'showmines'; // Text code for toggling mine visibility
+const DEVICE_ID_CODE = 'showid'; // Text code for toggling device ID display
+const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']; // Konami code for master dev mode
 
 // Generate or retrieve unique device ID
 function getDeviceId() {
@@ -315,8 +318,8 @@ function createCell(row, col) {
   const isHitMine = gameState.hitMineRow === row && gameState.hitMineCol === col;
   const hasMine = minePositions && minePositions[row] && minePositions[row][col] === -1;
   
-  // Developer mode: show mine indicator on unrevealed cells
-  if (developerMode && hasMine && !isRevealed) {
+  // Show mines mode: show mine indicator on unrevealed cells
+  if (showMinesMode && hasMine && !isRevealed) {
     cell.classList.add('dev-mine');
     cell.setAttribute('data-dev', '⚠️');
   }
@@ -1675,30 +1678,33 @@ async function fetchMinePositions() {
   }
 }
 
-// Secret code listener - Supports both "SHOWMINES" and Konami Code
+// Secret code listener - Supports "showdev", "showmines", "showid", and Konami Code
 document.addEventListener('keydown', async (e) => {
-  let codeMatched = false;
-  
-  // Track text code (SHOWMINES and SHOWID)
+  // Track text code (showmines, showid, and showdev)
   if (e.key.length === 1 && e.key.match(/[a-z]/i)) {
     keySequence += e.key.toLowerCase();
     
     // Keep only last length of longest secret code
-    const maxCodeLength = Math.max(SECRET_CODE.length, DEVICE_ID_CODE.length);
+    const maxCodeLength = Math.max(SECRET_CODE.length, DEVICE_ID_CODE.length, DEV_MODE_CODE.length);
     if (keySequence.length > maxCodeLength) {
       keySequence = keySequence.slice(-maxCodeLength);
     }
     
-    // Check if text sequence matches SECRET_CODE (developer mode)
-    if (keySequence === SECRET_CODE) {
-      codeMatched = true;
+    // Check if text sequence matches "showdev" - Toggle developer mode
+    if (keySequence === DEV_MODE_CODE) {
+      await toggleDeveloperMode();
       keySequence = ''; // Reset sequence
     }
     
-    // Check if text sequence matches DEVICE_ID_CODE
+    // Check if text sequence matches "showmines" - Toggle mine visibility
+    if (keySequence === SECRET_CODE) {
+      await toggleShowMines();
+      keySequence = ''; // Reset sequence
+    }
+    
+    // Check if text sequence matches "showid" - Toggle device ID display
     if (keySequence === DEVICE_ID_CODE) {
-      codeMatched = true; // Also trigger developer mode
-      showDeviceIdInfo();
+      toggleShowDeviceId();
       keySequence = ''; // Reset sequence
     }
   }
@@ -1711,50 +1717,80 @@ document.addEventListener('keydown', async (e) => {
     arrowSequence.shift();
   }
   
-  // Check if Konami sequence matches
+  // Check if Konami sequence matches - Toggle master developer mode
   if (arrowSequence.length === KONAMI_CODE.length) {
     const matches = arrowSequence.every((key, index) => key === KONAMI_CODE[index]);
     if (matches) {
-      codeMatched = true;
+      await toggleDeveloperMode();
       arrowSequence = []; // Reset sequence
     }
   }
-  
-  // If either code matched, toggle developer mode
-  if (codeMatched) {
-    developerMode = !developerMode;
-    console.log(`🔓 Developer Mode: ${developerMode ? 'ON' : 'OFF'}`);
-    
-    if (developerMode) {
-      await fetchMinePositions();
-    } else {
-      minePositions = null;
-    }
-    
-    renderBoard(); // Re-render to show/hide mines
-    
-    // Show notification
-    const message = developerMode ? '🔓 Developer Mode ACTIVATED' : '🔒 Developer Mode DEACTIVATED';
-    showNotification(message);
-  }
 });
 
-// Show Device ID info
-function showDeviceIdInfo() {
-  const devModeStatus = developerMode ? 'OFF' : 'ON'; // Will be toggled after this
-  const message = `🔑 Your Device ID:\n${DEVICE_ID}\n\n🔓 Developer Mode: ${devModeStatus}\n\n(Device ID copied to clipboard!)`;
+// Toggle show mines mode
+async function toggleShowMines() {
+  showMinesMode = !showMinesMode;
+  console.log(`💣 Show Mines Mode: ${showMinesMode ? 'ON' : 'OFF'}`);
   
-  // Copy to clipboard
-  navigator.clipboard.writeText(DEVICE_ID).then(() => {
-    alert(message);
-  }).catch((err) => {
-    // Fallback if clipboard API fails
-    alert(`🔑 Your Device ID:\n${DEVICE_ID}\n\n🔓 Developer Mode: ${devModeStatus}\n\n(Select and copy manually)`);
-    console.log('Device ID:', DEVICE_ID);
-  });
+  if (showMinesMode) {
+    await fetchMinePositions();
+  } else {
+    // Only clear mine positions if developer mode is also off
+    if (!developerMode) {
+      minePositions = null;
+    }
+  }
+  
+  renderBoard(); // Re-render to show/hide mines
   
   // Show notification
-  showNotification(`🔑 Device ID copied! Dev Mode: ${devModeStatus}`);
+  const message = showMinesMode ? '💣 Mine Visibility ON' : '🔒 Mine Visibility OFF';
+  showNotification(message);
+}
+
+// Toggle show device ID mode
+function toggleShowDeviceId() {
+  showDeviceIdMode = !showDeviceIdMode;
+  console.log(`🔑 Show Device ID Mode: ${showDeviceIdMode ? 'ON' : 'OFF'}`);
+  
+  if (showDeviceIdMode) {
+    // Show device ID
+    const message = `🔑 Device ID Display: ON\n\nYour Device ID:\n${DEVICE_ID}\n\n(Copied to clipboard!)`;
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(DEVICE_ID).then(() => {
+      alert(message);
+    }).catch((err) => {
+      // Fallback if clipboard API fails
+      alert(`🔑 Device ID Display: ON\n\nYour Device ID:\n${DEVICE_ID}\n\n(Select and copy manually)`);
+      console.log('Device ID:', DEVICE_ID);
+    });
+  } else {
+    // Hide device ID
+    const message = '🔒 Device ID Display: OFF';
+    showNotification(message);
+  }
+}
+
+// Toggle master developer mode (Konami code)
+async function toggleDeveloperMode() {
+  developerMode = !developerMode;
+  console.log(`🔓 Developer Mode: ${developerMode ? 'ON' : 'OFF'}`);
+  
+  if (developerMode) {
+    await fetchMinePositions();
+  } else {
+    // Only clear mine positions if show mines mode is also off
+    if (!showMinesMode) {
+      minePositions = null;
+    }
+  }
+  
+  renderBoard(); // Re-render board
+  
+  // Show notification
+  const message = developerMode ? '🔓 Developer Mode ACTIVATED' : '🔒 Developer Mode DEACTIVATED';
+  showNotification(message);
 }
 
 // Show notification
