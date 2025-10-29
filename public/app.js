@@ -982,6 +982,9 @@ let currentLeaderboardTab = 'Easy';
 
 let dailyLeaderboardData = {};
 let currentDailyDifficulty = 'all';
+let showingHistory = false;
+let availableDates = [];
+let selectedHistoryDate = null;
 
 async function loadLeaderboard(difficulty) {
   try {
@@ -989,21 +992,55 @@ async function loadLeaderboard(difficulty) {
     const data = await response.json();
     
     if (difficulty === 'Daily') {
-      // Group daily puzzle scores by difficulty (top 10 each)
-      dailyLeaderboardData = {};
-      Object.keys(data.leaderboard).forEach(diff => {
-        const scores = data.leaderboard[diff].filter(s => s.is_daily === 1);
-        if (scores.length > 0) {
-          dailyLeaderboardData[diff] = scores.slice(0, 10); // Top 10 per difficulty
-        }
-      });
-      displayDailyLeaderboard(currentDailyDifficulty);
+      if (showingHistory && selectedHistoryDate) {
+        // Load historical data for selected date
+        await loadHistoricalLeaderboard(selectedHistoryDate);
+      } else {
+        // Group daily puzzle scores by difficulty (top 10 each)
+        dailyLeaderboardData = {};
+        Object.keys(data.leaderboard).forEach(diff => {
+          const scores = data.leaderboard[diff].filter(s => s.is_daily === 1);
+          if (scores.length > 0) {
+            dailyLeaderboardData[diff] = scores.slice(0, 10); // Top 10 per difficulty
+          }
+        });
+        displayDailyLeaderboard(currentDailyDifficulty);
+      }
     } else {
-      displayLeaderboard(data.leaderboard[difficulty]);
+      // For regular difficulties, filter OUT daily scores (only show non-daily)
+      const regularScores = data.leaderboard[difficulty].filter(s => s.is_daily === 0 || !s.is_daily);
+      displayLeaderboard(regularScores);
     }
   } catch (error) {
     console.error('Error loading leaderboard:', error);
     displayLeaderboard([]);
+  }
+}
+
+// Load available historical dates
+async function loadHistoricalDates() {
+  try {
+    const response = await fetch(`${API_URL}/leaderboard/daily-dates`);
+    const data = await response.json();
+    availableDates = data.dates || [];
+    return availableDates;
+  } catch (error) {
+    console.error('Error loading historical dates:', error);
+    return [];
+  }
+}
+
+// Load historical leaderboard for a specific date
+async function loadHistoricalLeaderboard(dateKey) {
+  try {
+    const response = await fetch(`${API_URL}/leaderboard/daily-history/${dateKey}`);
+    const data = await response.json();
+    
+    dailyLeaderboardData = data.leaderboard || {};
+    displayDailyLeaderboard(currentDailyDifficulty, data.date);
+  } catch (error) {
+    console.error('Error loading historical leaderboard:', error);
+    displayDailyLeaderboard(currentDailyDifficulty);
   }
 }
 
@@ -1091,11 +1128,12 @@ function displayLeaderboard(scores, showDifficulty = false) {
   content.innerHTML = html;
 }
 
-function displayDailyLeaderboard(selectedDifficulty) {
+async function displayDailyLeaderboard(selectedDifficulty = 'all', historicalDate = null) {
   const content = document.getElementById('leaderboardContent');
   
   // Check if there are any scores at all
-  const hasScores = Object.keys(dailyLeaderboardData).length > 0;
+  const hasScores = Object.keys(dailyLeaderboardData).length > 0 && 
+    Object.values(dailyLeaderboardData).some(scores => scores.length > 0);
   
   // Difficulty icons mapping
   const difficultyIcons = {
@@ -1110,43 +1148,55 @@ function displayDailyLeaderboard(selectedDifficulty) {
   // Order of difficulties
   const difficultyOrder = ['Easy', 'Medium', 'Hard', 'Pro', 'Expert', 'Extreme'];
   
+  // Calculate total scores count for "All" button
+  let totalCount = 0;
+  difficultyOrder.forEach(diff => {
+    const scores = dailyLeaderboardData[diff];
+    if (scores && scores.length > 0) {
+      totalCount += scores.length;
+    }
+  });
+  
+  // Build history toggle button
+  let historyHeader = `
+    <div class="daily-history-header">
+      <button class="history-toggle-btn ${showingHistory ? 'active' : ''}" id="historyToggleBtn">
+        ${showingHistory ? '📊 Current' : '📅 History'}
+      </button>
+      ${historicalDate ? `<span class="historical-date-label">📆 ${historicalDate}</span>` : ''}
+    </div>
+  `;
+  
+  if (!hasScores) {
+    content.innerHTML = historyHeader + '<div class="no-scores">No daily puzzle scores yet. Be the first!</div>';
+    attachHistoryToggleListener();
+    return;
+  }
+  
   // Build difficulty selector (always show, even with no scores)
-  let html = '<div class="daily-difficulty-selector">';
+  let html = historyHeader + '<div class="daily-difficulty-selector">';
   
   html += `<button class="daily-diff-filter ${selectedDifficulty === 'all' ? 'active' : ''}" data-diff="all">
-    📅 All Difficulties
+    <span class="filter-icon">🎯</span>
+    <span class="filter-name">All</span>
+    ${totalCount > 0 ? `<span class="filter-count">${totalCount}</span>` : ''}
   </button>`;
   
   difficultyOrder.forEach(difficulty => {
     const icon = difficultyIcons[difficulty] || '📅';
     const scores = dailyLeaderboardData[difficulty];
     const count = scores ? scores.length : 0;
-    const countDisplay = count > 0 ? ` <span class="filter-count">(${count})</span>` : '';
     
     html += `
       <button class="daily-diff-filter ${selectedDifficulty === difficulty ? 'active' : ''}" data-diff="${difficulty}">
-        ${icon} ${difficulty}${countDisplay}
+        <span class="filter-icon">${icon}</span>
+        <span class="filter-name">${difficulty}</span>
+        ${count > 0 ? `<span class="filter-count">${count}</span>` : ''}
       </button>
     `;
   });
   
   html += '</div>';
-  
-  // If no scores at all, show empty state after selector
-  if (!hasScores) {
-    html += '<div class="no-scores">No daily puzzle scores yet. Be the first to complete today\'s challenge!</div>';
-    content.innerHTML = html;
-    
-    // Add event listeners to filter buttons
-    document.querySelectorAll('.daily-diff-filter').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const difficulty = btn.dataset.diff;
-        currentDailyDifficulty = difficulty;
-        displayDailyLeaderboard(difficulty);
-      });
-    });
-    return;
-  }
   
   // Display leaderboard based on selection
   if (selectedDifficulty === 'all') {
@@ -1315,12 +1365,15 @@ function displayDailyLeaderboard(selectedDifficulty) {
   
   content.innerHTML = html;
   
+  // Attach event listeners
+  attachHistoryToggleListener();
+  
   // Add event listeners to filter buttons
   document.querySelectorAll('.daily-diff-filter').forEach(btn => {
     btn.addEventListener('click', () => {
       const difficulty = btn.dataset.diff;
       currentDailyDifficulty = difficulty;
-      displayDailyLeaderboard(difficulty);
+      displayDailyLeaderboard(difficulty, historicalDate);
     });
   });
 }

@@ -6,6 +6,9 @@ node_modules/
 
 # Database
 leaderboard.db
+
+# Historical Daily Databases
+historical_daily/
 leaderboard.db-shm
 leaderboard.db-wal
 

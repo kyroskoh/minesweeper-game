@@ -19,7 +19,14 @@ const games = new Map();
 
 // Initialize SQLite database
 const dbPath = path.join(__dirname, '../leaderboard.db');
+const historicalDbDir = path.join(__dirname, '../historical_daily');
 let db;
+
+// Ensure historical directory exists
+if (!fs.existsSync(historicalDbDir)) {
+  fs.mkdirSync(historicalDbDir, { recursive: true });
+  console.log('Created historical_daily directory');
+}
 
 initSqlJs().then(SQL => {
   let buffer;
@@ -91,6 +98,82 @@ function saveDatabase() {
     const buffer = Buffer.from(data);
     fs.writeFileSync(dbPath, buffer);
   }
+}
+
+// Function to get historical database path for a given date (SGT)
+function getHistoricalDbPath(date = null) {
+  // Use provided date or get current date in SGT
+  let dateObj;
+  if (date) {
+    dateObj = new Date(date);
+  } else {
+    // Get current time in SGT (UTC+8)
+    const now = new Date();
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+    dateObj = new Date(utcTime + (8 * 60 * 60000));
+  }
+  
+  const year = dateObj.getUTCFullYear();
+  const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getUTCDate()).padStart(2, '0');
+  
+  const dateStr = `${year}${month}${day}`;
+  const filename = `historical_daily_leaderboard_${dateStr}.db`;
+  
+  return path.join(historicalDbDir, filename);
+}
+
+// Function to initialize/get historical database for a specific date
+async function getHistoricalDatabase(date = null) {
+  const SQL = await initSqlJs();
+  const dbPath = getHistoricalDbPath(date);
+  
+  let buffer;
+  let isNew = false;
+  
+  try {
+    buffer = fs.readFileSync(dbPath);
+  } catch (error) {
+    buffer = null;
+    isNew = true;
+  }
+  
+  const historicalDb = new SQL.Database(buffer);
+  
+  if (isNew) {
+    // Create table structure for historical database
+    historicalDb.run(`
+      CREATE TABLE IF NOT EXISTS daily_leaderboard (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        time INTEGER NOT NULL,
+        difficulty TEXT NOT NULL,
+        date TEXT NOT NULL,
+        device_id TEXT
+      )
+    `);
+    
+    // Create index for faster queries
+    historicalDb.run(`
+      CREATE INDEX IF NOT EXISTS idx_difficulty_time 
+      ON daily_leaderboard(difficulty, time)
+    `);
+    
+    // Save the new database
+    const data = historicalDb.export();
+    const newBuffer = Buffer.from(data);
+    fs.writeFileSync(dbPath, newBuffer);
+  }
+  
+  return historicalDb;
+}
+
+// Function to save historical database
+function saveHistoricalDatabase(historicalDb, date = null) {
+  const dbPath = getHistoricalDbPath(date);
+  const data = historicalDb.export();
+  const buffer = Buffer.from(data);
+  fs.writeFileSync(dbPath, buffer);
 }
 
 // Function to reload database from disk
@@ -549,7 +632,7 @@ app.get('/api/game/:gameId/dev', (req, res) => {
   });
 });
 
-app.post('/api/leaderboard', (req, res) => {
+app.post('/api/leaderboard', async (req, res) => {
   const { name, time, difficulty, date, isDailyPuzzle = false, deviceId } = req.body;
   
   if (!name || !time || !difficulty) {
@@ -566,11 +649,29 @@ app.post('/api/leaderboard', (req, res) => {
   };
 
   try {
+    // Save to main leaderboard
     db.run(
       'INSERT INTO leaderboard (name, time, difficulty, date, is_daily, device_id) VALUES (?, ?, ?, ?, ?, ?)',
       [entry.name, entry.time, entry.difficulty, entry.date, entry.isDailyPuzzle, entry.deviceId]
     );
     saveDatabase();
+    
+    // If this is a daily puzzle score, also save to historical database
+    if (entry.isDailyPuzzle) {
+      try {
+        const historicalDb = await getHistoricalDatabase(entry.date);
+        historicalDb.run(
+          'INSERT INTO daily_leaderboard (name, time, difficulty, date, device_id) VALUES (?, ?, ?, ?, ?)',
+          [entry.name, entry.time, entry.difficulty, entry.date, entry.deviceId]
+        );
+        saveHistoricalDatabase(historicalDb, entry.date);
+        historicalDb.close();
+        console.log(`✅ Daily score archived to historical database`);
+      } catch (error) {
+        console.error('Error saving to historical database:', error);
+        // Don't fail the request if historical save fails
+      }
+    }
     
     res.json({ success: true, entry });
   } catch (error) {
@@ -634,12 +735,78 @@ app.get('/api/leaderboard', async (req, res) => {
   }
 });
 
-//app.listen(PORT, () => {
-//  console.log(`Minesweeper server running on http://localhost:${PORT}`);
-//});
+// API endpoint to get historical daily scores for a specific date
+app.get('/api/leaderboard/daily-history/:date', async (req, res) => {
+  const { date } = req.params; // Format: YYYYMMDD
+  
+  try {
+    // Parse date and get historical database
+    const year = date.substring(0, 4);
+    const month = date.substring(4, 6);
+    const day = date.substring(6, 8);
+    const dateStr = `${year}-${month}-${day}`;
+    
+    const historicalDb = await getHistoricalDatabase(dateStr);
+    const byDifficulty = {};
+    
+    Object.keys(difficultyNames).forEach(key => {
+      const diffName = difficultyNames[key];
+      const stmt = historicalDb.prepare(
+        'SELECT name, time, difficulty, date, device_id FROM daily_leaderboard WHERE difficulty = ? ORDER BY time ASC LIMIT 10'
+      );
+      stmt.bind([diffName]);
+      
+      const scores = [];
+      while (stmt.step()) {
+        scores.push(stmt.getAsObject());
+      }
+      stmt.free();
+      
+      byDifficulty[diffName] = scores;
+    });
+    
+    historicalDb.close();
+    
+    res.json({ 
+      date: dateStr,
+      leaderboard: byDifficulty 
+    });
+  } catch (error) {
+    console.error('Error fetching historical leaderboard:', error);
+    res.status(500).json({ error: 'Failed to fetch historical leaderboard' });
+  }
+});
+
+// API endpoint to list available historical dates
+app.get('/api/leaderboard/daily-dates', (req, res) => {
+  try {
+    const files = fs.readdirSync(historicalDbDir);
+    const dates = files
+      .filter(f => f.startsWith('historical_daily_leaderboard_') && f.endsWith('.db'))
+      .map(f => {
+        const dateStr = f.replace('historical_daily_leaderboard_', '').replace('.db', '');
+        const year = dateStr.substring(0, 4);
+        const month = dateStr.substring(4, 6);
+        const day = dateStr.substring(6, 8);
+        return {
+          dateKey: dateStr,
+          displayDate: `${year}-${month}-${day}`
+        };
+      })
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey)); // Most recent first
+    
+    res.json({ dates });
+  } catch (error) {
+    console.error('Error listing historical dates:', error);
+    res.json({ dates: [] });
+  }
+});
 
 // Bind only to loopback (safer)
-app.listen(PORT, '127.0.0.1', () => console.log(`API on 127.0.0.1:${PORT}`));
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`🚀 Minesweeper server running on http://127.0.0.1:${PORT}`);
+  console.log(`📁 Historical daily databases stored in: ${historicalDbDir}`);
+});
 
 // If you use secure cookies/sessions behind Nginx:
 app.set('trust proxy', 1); // so req.secure / X-Forwarded-* work
