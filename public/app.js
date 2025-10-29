@@ -1378,6 +1378,201 @@ async function displayDailyLeaderboard(selectedDifficulty = 'all', historicalDat
   });
 }
 
+// Attach history toggle button listener
+function attachHistoryToggleListener() {
+  const historyBtn = document.getElementById('historyToggleBtn');
+  if (historyBtn) {
+    historyBtn.addEventListener('click', async () => {
+      if (!showingHistory) {
+        // Switch to history view
+        await showHistoryCalendar();
+      } else {
+        // Switch back to current view
+        showingHistory = false;
+        selectedHistoryDate = null;
+        await loadLeaderboard('Daily');
+      }
+    });
+  }
+}
+
+// Show history calendar/date selector
+async function showHistoryCalendar() {
+  const dates = await loadHistoricalDates();
+  
+  if (dates.length === 0) {
+    alert('No historical data available yet. Daily scores are archived automatically.');
+    return;
+  }
+  
+  // Convert date keys to a Set for quick lookup
+  const availableDateKeys = new Set(dates.map(d => d.dateKey));
+  
+  // Get current month/year (SGT)
+  const now = new Date();
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const sgtNow = new Date(utcTime + (8 * 60 * 60000));
+  
+  let currentMonth = sgtNow.getMonth();
+  let currentYear = sgtNow.getFullYear();
+  
+  // Find the earliest and latest dates with data
+  const sortedDates = dates.map(d => parseInt(d.dateKey)).sort((a, b) => a - b);
+  const earliestDate = sortedDates[0].toString();
+  const latestDate = sortedDates[sortedDates.length - 1].toString();
+  
+  const earliestYear = parseInt(earliestDate.substring(0, 4));
+  const earliestMonth = parseInt(earliestDate.substring(4, 6)) - 1;
+  const latestYear = parseInt(latestDate.substring(0, 4));
+  const latestMonth = parseInt(latestDate.substring(4, 6)) - 1;
+  
+  // Start with the latest month that has data
+  currentMonth = latestMonth;
+  currentYear = latestYear;
+  
+  function renderCalendar() {
+    const content = document.getElementById('leaderboardContent');
+    
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                       'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    // Get first day of month and number of days
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const numDays = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay(); // 0 = Sunday
+    
+    // Check if we can navigate to previous/next month
+    const canGoPrev = (currentYear > earliestYear) || 
+                      (currentYear === earliestYear && currentMonth > earliestMonth);
+    const canGoNext = (currentYear < latestYear) || 
+                      (currentYear === latestYear && currentMonth < latestMonth);
+    
+    let html = `
+      <div class="daily-history-header">
+        <button class="history-toggle-btn active" id="historyBackBtn">
+          📊 Back to Current
+        </button>
+        <h3 style="margin: 0; color: #333;">Daily Puzzle History</h3>
+      </div>
+      
+      <div class="calendar-container">
+        <div class="calendar-header">
+          <button class="calendar-nav-btn ${!canGoPrev ? 'disabled' : ''}" id="prevMonthBtn" ${!canGoPrev ? 'disabled' : ''}>
+            ◀
+          </button>
+          <h3 class="calendar-month-year">${monthNames[currentMonth]} ${currentYear}</h3>
+          <button class="calendar-nav-btn ${!canGoNext ? 'disabled' : ''}" id="nextMonthBtn" ${!canGoNext ? 'disabled' : ''}>
+            ▶
+          </button>
+        </div>
+        
+        <div class="calendar-grid">
+          <div class="calendar-day-header">Sun</div>
+          <div class="calendar-day-header">Mon</div>
+          <div class="calendar-day-header">Tue</div>
+          <div class="calendar-day-header">Wed</div>
+          <div class="calendar-day-header">Thu</div>
+          <div class="calendar-day-header">Fri</div>
+          <div class="calendar-day-header">Sat</div>
+    `;
+    
+    // Add empty cells for days before the first of the month
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      html += '<div class="calendar-day empty"></div>';
+    }
+    
+    // Add days of the month
+    const today = sgtNow.getDate();
+    const isCurrentMonth = currentMonth === sgtNow.getMonth() && currentYear === sgtNow.getFullYear();
+    
+    for (let day = 1; day <= numDays; day++) {
+      const dateKey = `${currentYear}${String(currentMonth + 1).padStart(2, '0')}${String(day).padStart(2, '0')}`;
+      const hasData = availableDateKeys.has(dateKey);
+      const isToday = isCurrentMonth && day === today;
+      
+      const classes = ['calendar-day'];
+      if (hasData) classes.push('has-data');
+      if (isToday) classes.push('today');
+      if (!hasData) classes.push('no-data');
+      
+      html += `
+        <div class="${classes.join(' ')}" ${hasData ? `data-date="${dateKey}"` : ''}>
+          <span class="day-number">${day}</span>
+          ${hasData ? '<span class="data-indicator">●</span>' : ''}
+        </div>
+      `;
+    }
+    
+    html += `
+        </div>
+        
+        <div class="calendar-legend">
+          <div class="legend-item">
+            <span class="legend-dot has-data">●</span>
+            <span>Has scores</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot today">●</span>
+            <span>Today</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot no-data">○</span>
+            <span>No data</span>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    content.innerHTML = html;
+    
+    // Attach event listeners
+    document.getElementById('historyBackBtn')?.addEventListener('click', async () => {
+      showingHistory = false;
+      selectedHistoryDate = null;
+      await loadLeaderboard('Daily');
+    });
+    
+    document.getElementById('prevMonthBtn')?.addEventListener('click', () => {
+      if (canGoPrev) {
+        currentMonth--;
+        if (currentMonth < 0) {
+          currentMonth = 11;
+          currentYear--;
+        }
+        renderCalendar();
+      }
+    });
+    
+    document.getElementById('nextMonthBtn')?.addEventListener('click', () => {
+      if (canGoNext) {
+        currentMonth++;
+        if (currentMonth > 11) {
+          currentMonth = 0;
+          currentYear++;
+        }
+        renderCalendar();
+      }
+    });
+    
+    // Attach click listeners to days with data
+    document.querySelectorAll('.calendar-day.has-data').forEach(dayElement => {
+      dayElement.addEventListener('click', async () => {
+        const dateKey = dayElement.dataset.date;
+        showingHistory = true;
+        selectedHistoryDate = dateKey;
+        
+        // Visual feedback
+        dayElement.classList.add('selected');
+        
+        await loadHistoricalLeaderboard(dateKey);
+      });
+    });
+  }
+  
+  renderCalendar();
+}
+
 function showLeaderboard() {
   leaderboardModal.classList.add('show');
   loadLeaderboard(currentLeaderboardTab);
