@@ -756,7 +756,13 @@ h1 {
   color: #333;
 }
 
-.leaderboard-table tr:hover {
+/* Only apply hover to body rows, not header */
+.leaderboard-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+/* Keep header background consistent on hover */
+.leaderboard-table thead tr:hover th {
   background: #f8f9fa;
 }
 
@@ -772,7 +778,7 @@ h1 {
   font-weight: 500;
 }
 
-.leaderboard-table tr.current-user:hover {
+.leaderboard-table tbody tr.current-user:hover {
   background: linear-gradient(90deg, #c8e6c9 0%, #dcedc8 100%);
 }
 
@@ -782,9 +788,33 @@ h1 {
   white-space: nowrap;
 }
 
-/* Ensure emojis render properly on all devices */
-.leaderboard-table tr.current-user td:nth-child(2) {
+/* User icon styling - ensure visibility on all devices */
+.user-icon {
+  display: inline-block;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Segoe UI Emoji", "Segoe UI Symbol", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+  font-style: normal;
+  font-weight: normal;
+  font-size: 1em;
+  line-height: 1;
+  margin-left: 4px;
+  vertical-align: middle;
+  color: #4caf50;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Fallback: if emoji doesn't render, show text indicator */
+@supports not (font-family: "Apple Color Emoji") {
+  .user-icon::before {
+    content: "[YOU]";
+    font-family: inherit;
+    font-size: 0.75em;
+    color: #4caf50;
+    font-weight: bold;
+  }
+  .user-icon {
+    font-size: 0;
+  }
 }
 
 .no-scores {
@@ -934,14 +964,10 @@ h1 {
   white-space: nowrap;
 }
 
-.leaderboard-table.grouped tr.current-user:hover td {
+.leaderboard-table.grouped tbody tr.current-user:hover td {
   background: linear-gradient(90deg, #c8e6c9 0%, #dcedc8 100%) !important;
 }
 
-/* Ensure emojis render properly in grouped tables */
-.leaderboard-table.grouped tr.current-user td:nth-child(2) {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Segoe UI Emoji", "Segoe UI Symbol", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
-}
 
 /* Daily Leaderboard Single Difficulty View */
 .daily-leaderboard-single {
@@ -1024,7 +1050,7 @@ h1 {
   content: '🥉 ';
 }
 
-.leaderboard-table.single tr:hover {
+.leaderboard-table.single tbody tr:hover {
   background: rgba(102, 126, 234, 0.05);
 }
 
@@ -1037,14 +1063,10 @@ h1 {
   white-space: nowrap;
 }
 
-.leaderboard-table.single tr.current-user:hover td {
+.leaderboard-table.single tbody tr.current-user:hover td {
   background: linear-gradient(90deg, #c8e6c9 0%, #dcedc8 100%) !important;
 }
 
-/* Ensure emojis render properly in single view tables */
-.leaderboard-table.single tr.current-user td:nth-child(2) {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Segoe UI Emoji", "Segoe UI Symbol", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
-}
 
 /* Developer Mode */
 .dev-mine {

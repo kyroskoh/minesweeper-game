@@ -1074,7 +1074,7 @@ function displayLeaderboard(scores, showDifficulty = false) {
     const date = new Date(score.date).toLocaleDateString();
     const isCurrentUser = score.device_id && score.device_id === DEVICE_ID;
     const userClass = isCurrentUser ? ' class="current-user"' : '';
-    const userIndicator = isCurrentUser ? ' 👤' : '';
+    const userIndicator = isCurrentUser ? ' <span class="user-icon" title="You">&#128100;</span>' : '';
     
     html += `
       <tr${userClass}>
@@ -1212,7 +1212,7 @@ function displayDailyLeaderboard(selectedDifficulty) {
         const date = new Date(score.date).toLocaleDateString();
         const isCurrentUser = score.device_id && score.device_id === DEVICE_ID;
         const userClass = isCurrentUser ? ' class="current-user"' : '';
-        const userIndicator = isCurrentUser ? ' 👤' : '';
+        const userIndicator = isCurrentUser ? ' <span class="user-icon" title="You">&#128100;</span>' : '';
         
         html += `
           <tr${userClass}>
@@ -1293,7 +1293,7 @@ function displayDailyLeaderboard(selectedDifficulty) {
         const date = new Date(score.date).toLocaleDateString();
         const isCurrentUser = score.device_id && score.device_id === DEVICE_ID;
         const userClass = isCurrentUser ? ' current-user' : '';
-        const userIndicator = isCurrentUser ? ' 👤' : '';
+        const userIndicator = isCurrentUser ? ' <span class="user-icon" title="You">&#128100;</span>' : '';
         
         html += `
           <tr class="rank-${index + 1}${userClass}">
