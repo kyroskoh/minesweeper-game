@@ -1,0 +1,123 @@
+# Host 2 - All-in-One (App + PostgreSQL + etcd)
+# Runs: App2, PostgreSQL2 (Replica), etcd2
+# Usage: docker-compose -f docker-compose.host2.yml up -d
+
+version: '3.8'
+
+services:
+  # etcd Node 2
+  etcd2:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: minesweeper-etcd2
+    restart: unless-stopped
+    environment:
+      ETCD_NAME: etcd2
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://${HOST2_IP}:2380
+      ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://${HOST2_IP}:2379
+      ETCD_INITIAL_CLUSTER: etcd1=http://${HOST1_IP}:2380,etcd2=http://${HOST2_IP}:2380,etcd3=http://${HOST1_IP}:2381
+      ETCD_INITIAL_CLUSTER_STATE: new
+      ETCD_INITIAL_CLUSTER_TOKEN: minesweeper-patroni
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    networks:
+      - app-network
+    volumes:
+      - etcd2-data:/etcd-data
+
+  # PostgreSQL Node 2 (Replica)
+  postgres2:
+    image: patroni/patroni:3.1.2
+    container_name: minesweeper-postgres2
+    restart: unless-stopped
+    depends_on:
+      - etcd2
+    env_file:
+      - .env.host2
+    environment:
+      PATRONI_NAME: postgres2
+      PATRONI_SCOPE: minesweeper-cluster
+      PATRONI_ETCD3_HOSTS: ${HOST1_IP}:2379,${HOST2_IP}:2379,${HOST1_IP}:2378
+      PATRONI_POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
+      PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: ${HOST2_IP}:5432
+      PATRONI_RESTAPI_LISTEN: 0.0.0.0:8008
+      PATRONI_RESTAPI_CONNECT_ADDRESS: ${HOST2_IP}:8008
+      PATRONI_SUPERUSER_USERNAME: ${POSTGRES_SUPERUSER:-postgres}
+      PATRONI_SUPERUSER_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      PATRONI_REPLICATION_USERNAME: replicator
+      PATRONI_REPLICATION_PASSWORD: ${REPLICATION_PASSWORD}
+    ports:
+      - "5432:5432"
+      - "8008:8008"
+    networks:
+      - app-network
+    volumes:
+      - postgres2-data:/var/lib/postgresql/data
+      - ./patroni/patroni.yml:/etc/patroni.yml
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-minesweeper_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # HAProxy for local health-aware routing
+  haproxy2:
+    image: haproxy:2.8-alpine
+    container_name: minesweeper-haproxy2
+    restart: unless-stopped
+    depends_on:
+      - postgres2
+    environment:
+      HOST1_IP: ${HOST1_IP}
+      HOST2_IP: ${HOST2_IP}
+    ports:
+      - "5000:5000"  # Primary
+      - "7000:7000"  # Stats
+    networks:
+      - app-network
+    volumes:
+      - ./haproxy/haproxy-2host.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+
+  # Minesweeper App 2
+  app2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: minesweeper-app2
+    restart: unless-stopped
+    depends_on:
+      - postgres2
+      - haproxy2
+    env_file:
+      - .env.host2
+    environment:
+      PORT: 3030
+      # Connect to local HAProxy for automatic failover
+      POSTGRES_HOST: haproxy2
+      POSTGRES_PORT: 5000
+      POSTGRES_DB: ${POSTGRES_DB:-minesweeper}
+      POSTGRES_USER: ${POSTGRES_USER:-minesweeper_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DAILY_SEED_SALT: ${DAILY_SEED_SALT}
+      SERVER_NAME: host2
+    ports:
+      - "3030:3030"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3030/api/leaderboard"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  etcd2-data:
+  postgres2-data:
+

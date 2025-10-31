@@ -37,6 +37,8 @@ minesweeper/
 
 ## Running the Game
 
+### SQLite Mode (Default - Single Server)
+
 1. Start the server:
    ```bash
    npm start
@@ -48,6 +50,64 @@ minesweeper/
    ```
 
 3. Start playing!
+
+### PostgreSQL Mode (High Availability - Multi-Server)
+
+For production deployments across multiple servers:
+
+1. Set up PostgreSQL (see [PostgreSQL HA Setup Guide](POSTGRESQL_HA_SETUP.md))
+2. Configure `.env` with your PostgreSQL credentials
+3. Migrate existing data: `npm run migrate-to-postgres`
+4. Start the server:
+   ```bash
+   npm run start:postgres
+   ```
+
+**📖 Full setup guide:** [POSTGRESQL_HA_SETUP.md](POSTGRESQL_HA_SETUP.md)
+
+### Docker Mode (Easiest for Production)
+
+Deploy with Docker for simplified setup:
+
+```bash
+# Local development (full stack)
+docker-compose up -d
+
+# Production (3-server HA setup)
+./deploy/deploy-db.sh      # Database server
+./deploy/deploy-server1.sh  # App server 1
+./deploy/deploy-server2.sh  # App server 2
+```
+
+**📖 Docker guide:** [DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md)
+
+### PostgreSQL High Availability with Replication
+
+**Option A: 2-Host Setup (Recommended - Simpler)**
+
+Each host runs both app AND database with auto-sync:
+```bash
+# Host 1
+./deploy/deploy-host1.sh
+
+# Host 2
+./deploy/deploy-host2.sh
+```
+
+**📖 2-host guide:** [TWO_HOST_DEPLOYMENT.md](TWO_HOST_DEPLOYMENT.md)
+
+**Option B: 5-Server Setup (Advanced - Dedicated DBs)**
+
+Separate database servers with dedicated coordinator:
+```bash
+# Local testing (all-in-one)
+npm run docker:ha
+
+# Production deployment
+# See detailed guide
+```
+
+**📖 5-server guide:** [POSTGRES_HA_REPLICATION.md](POSTGRES_HA_REPLICATION.md)
 
 ## How to Play
 
@@ -104,6 +164,7 @@ minesweeper/
 
 ## Database
 
+### SQLite (Default)
 The leaderboard scores are stored in `leaderboard.db` (SQLite database). The database is automatically created on first run and includes:
 - Player names
 - Completion times
@@ -111,6 +172,15 @@ The leaderboard scores are stored in `leaderboard.db` (SQLite database). The dat
 - Timestamps
 
 Top 10 scores for each difficulty level are displayed in the leaderboard.
+
+### PostgreSQL (High Availability)
+For multi-server deployments, use PostgreSQL mode:
+- **Centralized database** - all servers share the same data
+- **Real-time synchronization** - scores are instantly visible across servers
+- **Scalable** - handles multiple concurrent connections
+- **Production-ready** - built-in replication and backup features
+
+See [POSTGRESQL_HA_SETUP.md](POSTGRESQL_HA_SETUP.md) for setup instructions.
 
 ### Offline Support
 

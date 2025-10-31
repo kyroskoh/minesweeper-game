@@ -1,0 +1,66 @@
+# Docker Compose - Full Stack (App + PostgreSQL)
+# Usage: docker-compose up -d
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: minesweeper-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-minesweeper}
+      POSTGRES_USER: ${POSTGRES_USER:-minesweeper_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker-init:/docker-entrypoint-initdb.d
+    networks:
+      - minesweeper-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-minesweeper_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Minesweeper App
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: minesweeper-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: ${PORT:-3030}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-minesweeper}
+      POSTGRES_USER: ${POSTGRES_USER:-minesweeper_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_SSL: ${POSTGRES_SSL:-false}
+      DAILY_SEED_SALT: ${DAILY_SEED_SALT:-minesweeper-daily-puzzle-salt-2025}
+    ports:
+      - "${PORT:-3030}:3030"
+    networks:
+      - minesweeper-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3030/api/leaderboard"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  minesweeper-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+

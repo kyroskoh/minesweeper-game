@@ -1,0 +1,58 @@
+# PostgreSQL HA - Coordinator Server
+# Runs: etcd3 (quorum) + HAProxy (load balancer)
+# Usage: docker-compose -f deploy/docker-compose.coordinator.yml up -d
+
+version: '3.8'
+
+services:
+  # etcd Node 3 (for quorum)
+  etcd3:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: minesweeper-etcd3
+    restart: unless-stopped
+    environment:
+      ETCD_NAME: etcd3
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://${COORDINATOR_IP}:2380
+      ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://${COORDINATOR_IP}:2379
+      ETCD_INITIAL_CLUSTER: etcd1=http://${DB_SERVER1_IP}:2380,etcd2=http://${DB_SERVER2_IP}:2380,etcd3=http://${COORDINATOR_IP}:2380
+      ETCD_INITIAL_CLUSTER_STATE: new
+      ETCD_INITIAL_CLUSTER_TOKEN: patroni-cluster
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    networks:
+      - db-network
+    volumes:
+      - etcd3-data:/etcd-data
+
+  # HAProxy - Load balancer for PostgreSQL
+  haproxy:
+    image: haproxy:2.8-alpine
+    container_name: minesweeper-haproxy
+    restart: unless-stopped
+    environment:
+      DB_SERVER1_IP: ${DB_SERVER1_IP}
+      DB_SERVER2_IP: ${DB_SERVER2_IP}
+    ports:
+      - "5000:5000"    # Read-Write port (Primary only)
+      - "5001:5001"    # Read-Only port (All replicas)
+      - "7000:7000"    # HAProxy stats
+    networks:
+      - db-network
+    volumes:
+      - ../haproxy/haproxy-distributed.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "5000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  db-network:
+    driver: bridge
+
+volumes:
+  etcd3-data:
+

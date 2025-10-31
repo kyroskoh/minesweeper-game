@@ -1,8 +1,13 @@
 # Dependencies
 node_modules/
 
-# Environment Variables
+# Environment Variables (SENSITIVE - Never commit!)
 .env
+.env.local
+.env.production
+.env.server1
+.env.server2
+*.env
 
 # Database
 leaderboard.db
@@ -12,10 +17,32 @@ historical_daily/
 leaderboard.db-shm
 leaderboard.db-wal
 
+# Docker volumes and data
+postgres-data/
+postgres1-data/
+postgres2-data/
+pgdata/
+docker-volumes/
+etcd1-data/
+etcd2-data/
+etcd3-data/
+
 # Logs
 *.log
 npm-debug.log*
+logs/
 
 # OS
 .DS_Store
 Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backups
+*.backup
+*.bak
+backup_*

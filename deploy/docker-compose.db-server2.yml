@@ -1,0 +1,69 @@
+# PostgreSQL HA - Database Server 2
+# Runs: etcd2 + postgres2 (Replica/Standby node)
+# Usage: docker-compose -f deploy/docker-compose.db-server2.yml up -d
+
+version: '3.8'
+
+services:
+  # etcd Node 2
+  etcd2:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: minesweeper-etcd2
+    restart: unless-stopped
+    environment:
+      ETCD_NAME: etcd2
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://${DB_SERVER2_IP}:2380
+      ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://${DB_SERVER2_IP}:2379
+      ETCD_INITIAL_CLUSTER: etcd1=http://${DB_SERVER1_IP}:2380,etcd2=http://${DB_SERVER2_IP}:2380,etcd3=http://${COORDINATOR_IP}:2380
+      ETCD_INITIAL_CLUSTER_STATE: new
+      ETCD_INITIAL_CLUSTER_TOKEN: patroni-cluster
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    networks:
+      - db-network
+    volumes:
+      - etcd2-data:/etcd-data
+
+  # PostgreSQL Node 2 (Replica/Standby)
+  postgres2:
+    image: patroni/patroni:3.1.2
+    container_name: minesweeper-postgres2
+    restart: unless-stopped
+    depends_on:
+      - etcd2
+    env_file:
+      - ../.env.postgres-ha
+    environment:
+      PATRONI_NAME: postgres2
+      PATRONI_SCOPE: minesweeper-cluster
+      PATRONI_ETCD3_HOSTS: ${DB_SERVER1_IP}:2379,${DB_SERVER2_IP}:2379,${COORDINATOR_IP}:2379
+      PATRONI_POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
+      PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: ${DB_SERVER2_IP}:5432
+      PATRONI_RESTAPI_LISTEN: 0.0.0.0:8008
+      PATRONI_RESTAPI_CONNECT_ADDRESS: ${DB_SERVER2_IP}:8008
+    networks:
+      - db-network
+    ports:
+      - "5432:5432"
+      - "8008:8008"
+    volumes:
+      - postgres2-data:/var/lib/postgresql/data
+      - ../patroni/patroni.yml:/etc/patroni.yml
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-minesweeper_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  db-network:
+    driver: bridge
+
+volumes:
+  etcd2-data:
+  postgres2-data:
+
